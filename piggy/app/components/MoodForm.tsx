@@ -2,6 +2,7 @@
 
 import { useState, useCallback, memo } from 'react';
 import { saveMood } from '@/lib/actions';
+import { useToast } from './ToastProvider';
 
 export const MOODS = [
   { label: '开心', emoji: '😊', value: 'happy' },
@@ -71,19 +72,29 @@ function MoodForm({ onSuccess }: { onSuccess?: () => void }) {
   const [selectedMood, setSelectedMood] = useState('');
   const [intensity, setIntensity] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { showToast } = useToast();
 
   const handleSubmit = useCallback(async (formData: FormData) => {
+    if (!selectedMood) {
+      showToast('先选一个心情嘛，想抱抱你～ 💕', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await saveMood(formData);
       // Reset form state
       setSelectedMood('');
       setIntensity(0);
+      showToast('记录好啦，我会一直陪着你 💖', 'success');
       if (onSuccess) onSuccess();
+    } catch (error) {
+      console.error(error);
+      showToast('哎呀出错啦，再试一次好不好～', 'error');
     } finally {
       setIsSubmitting(false);
     }
-  }, [onSuccess]);
+  }, [onSuccess, selectedMood, showToast]);
 
   return (
     <form action={handleSubmit} className="space-y-4 w-full mx-auto">

@@ -1,12 +1,21 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { authenticate, type AuthState } from '@/lib/auth';
+import { useToast } from './ToastProvider';
 
 const initialState: AuthState = {};
 
 export default function LoginForm() {
   const [state, dispatch] = useFormState(authenticate, initialState);
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    if (state?.error) {
+      showToast(state.error, 'error');
+    }
+  }, [showToast, state?.error]);
 
   return (
     <form
@@ -30,10 +39,6 @@ export default function LoginForm() {
           autoComplete="current-password"
         />
       </div>
-
-      {state?.error && (
-        <p className="text-sm text-pink-600 text-center">{state.error}</p>
-      )}
 
       <SubmitButton />
     </form>

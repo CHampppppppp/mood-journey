@@ -1,15 +1,25 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { useState } from 'react';
 import { recoverPassword, type RecoveryState } from '@/lib/auth';
 import { securityQuestions } from '@/lib/securityQuestions';
+import { useToast } from './ToastProvider';
 
 const initialRecoveryState: RecoveryState = {};
 
 export default function ForgotPasswordModal() {
     const [open, setOpen] = useState(false);
     const [state, action] = useFormState(recoverPassword, initialRecoveryState);
+    const { showToast } = useToast();
+
+    useEffect(() => {
+        if (state?.error) {
+            showToast(state.error, 'error');
+        } else if (state?.success) {
+            showToast('闯关成功！快把密码抱回家 💞', 'success');
+        }
+    }, [showToast, state?.error, state?.success]);
 
     return (
         <>
@@ -62,10 +72,6 @@ export default function ForgotPasswordModal() {
                                     </div>
                                 </fieldset>
                             ))}
-
-                            {state?.error && (
-                                <p className="text-center text-sm text-pink-600">{state.error}</p>
-                            )}
 
                             {state?.success && state.password && (
                                 <div className="space-y-2 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-center">
