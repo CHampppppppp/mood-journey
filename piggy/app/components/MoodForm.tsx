@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { saveMood } from '@/lib/actions';
 
 export const MOODS = [
@@ -12,20 +12,78 @@ export const MOODS = [
   { label: '沮丧', emoji: '😔', value: 'depressed' },
 ];
 
-export default function MoodForm({ onSuccess }: { onSuccess?: () => void }) {
+// 优化的心情按钮组件
+const MoodButton = memo(({ 
+  mood, 
+  isSelected, 
+  onClick 
+}: { 
+  mood: typeof MOODS[0]; 
+  isSelected: boolean; 
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`flex flex-col items-center p-3 rounded-2xl border-2 transition-all duration-200 ${
+      isSelected
+        ? 'bg-gradient-to-br from-pink-50 to-purple-50 border-pink-400 scale-105 shadow-lg'
+        : 'bg-gradient-to-br from-gray-50 to-white border-transparent hover:from-pink-50 hover:to-purple-50 hover:border-pink-200'
+    }`}
+  >
+    <span className="text-4xl mb-2 filter drop-shadow-sm">{mood.emoji}</span>
+    <span className={`text-sm font-medium ${isSelected ? 'bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent' : 'text-gray-500'}`}>
+      {mood.label}
+    </span>
+  </button>
+));
+
+MoodButton.displayName = 'MoodButton';
+
+// 优化的强度按钮组件
+const IntensityButton = memo(({ 
+  level, 
+  isSelected, 
+  onClick,
+  label
+}: { 
+  level: number; 
+  isSelected: boolean; 
+  onClick: () => void;
+  label: string;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`flex-1 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-200 ${
+      isSelected
+        ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-pink-600 shadow-md ring-2 ring-pink-200/50'
+        : 'text-gray-400 hover:text-gray-600'
+    }`}
+  >
+    {label}
+  </button>
+));
+
+IntensityButton.displayName = 'IntensityButton';
+
+function MoodForm({ onSuccess }: { onSuccess?: () => void }) {
   const [selectedMood, setSelectedMood] = useState('');
   const [intensity, setIntensity] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (formData: FormData) => {
-      setIsSubmitting(true);
+  const handleSubmit = useCallback(async (formData: FormData) => {
+    setIsSubmitting(true);
+    try {
       await saveMood(formData);
-      setIsSubmitting(false);
       // Reset form state
       setSelectedMood('');
       setIntensity(0);
       if (onSuccess) onSuccess();
-  };
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [onSuccess]);
 
   return (
     <form action={handleSubmit} className="space-y-6 w-full mx-auto">
@@ -33,21 +91,12 @@ export default function MoodForm({ onSuccess }: { onSuccess?: () => void }) {
         <label className="block text-lg font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-4 text-center">今天心情怎么样呀？Piggy~</label>
         <div className="grid grid-cols-3 gap-3">
           {MOODS.map((m) => (
-            <button
+            <MoodButton
               key={m.value}
-              type="button"
+              mood={m}
+              isSelected={selectedMood === m.value}
               onClick={() => setSelectedMood(m.value)}
-              className={`flex flex-col items-center p-3 rounded-2xl border-2 transition-all duration-200 ${
-                selectedMood === m.value
-                  ? 'bg-gradient-to-br from-pink-50 to-purple-50 border-pink-400 scale-105 shadow-lg'
-                  : 'bg-gradient-to-br from-gray-50 to-white border-transparent hover:from-pink-50 hover:to-purple-50 hover:border-pink-200'
-              }`}
-            >
-              <span className="text-4xl mb-2 filter drop-shadow-sm">{m.emoji}</span>
-              <span className={`text-sm font-medium ${selectedMood === m.value ? 'bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent' : 'text-gray-500'}`}>
-                {m.label}
-              </span>
-            </button>
+            />
           ))}
         </div>
         <input type="hidden" name="mood" value={selectedMood} />
@@ -61,18 +110,13 @@ export default function MoodForm({ onSuccess }: { onSuccess?: () => void }) {
             </label>
             <div className="flex justify-between bg-gradient-to-br from-pink-50/50 to-purple-50/50 p-2 rounded-2xl border border-pink-200/30">
                 {[0, 1, 2, 3].map((level) => (
-                <button
+                  <IntensityButton
                     key={level}
-                    type="button"
+                    level={level}
+                    isSelected={intensity === level}
                     onClick={() => setIntensity(level)}
-                    className={`flex-1 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-200 ${
-                    intensity === level
-                        ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-pink-600 shadow-md ring-2 ring-pink-200/50'
-                        : 'text-gray-400 hover:text-gray-600'
-                    }`}
-                >
-                    {level === 0 ? '一点点' : level === 3 ? '超级' : level}
-                </button>
+                    label={level === 0 ? '一点点' : level === 3 ? '超级' : String(level)}
+                  />
                 ))}
             </div>
             <input type="hidden" name="intensity" value={intensity} />
@@ -102,4 +146,6 @@ export default function MoodForm({ onSuccess }: { onSuccess?: () => void }) {
     </form>
   );
 }
+
+export default memo(MoodForm);
 
