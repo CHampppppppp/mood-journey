@@ -7,7 +7,17 @@ import { revalidatePath } from 'next/cache';
 import { securityQuestions } from '@/lib/securityQuestions';
 
 const AUTH_COOKIE = 'piggy-auth';
+const ATTEMPT_COOKIE = 'piggy-auth-attempts';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+
+const FAILURE_MESSAGES = [
+  '密码打错啦，手抖了嘛宝宝？',
+  '是不是最近事情多，忘了密码呀？',
+  '好叭没爱了。。。',
+  '还是直接来问我吧hh',
+  '还真是倔强傲娇小公主。',
+  '再输错网站将自我毁灭。'
+] as const;
 
 export type AuthState = {
   error?: string;
@@ -45,7 +55,7 @@ export async function authenticate(
   const password = formData.get('password');
 
   if (typeof password !== 'string' || password.length === 0) {
-    return { error: '请输入密码哦~' };
+    return { error: '是不是漏掉什么没填了呀宝宝？' };
   }
 
   const expected = process.env.GIRLFRIEND_PASSWORD;
@@ -54,13 +64,31 @@ export async function authenticate(
   }
 
   const normalizedExpected = expected.toLowerCase();
+  const cookieStore = await cookies();
+
   if (password.toLowerCase() !== normalizedExpected) {
     // Delay a little bit to slow down brute force attempts
     await new Promise((resolve) => setTimeout(resolve, 500));
-    return { error: '密码不对呀，再想想~' };
+
+    const attemptCookie = cookieStore.get(ATTEMPT_COOKIE)?.value ?? '0';
+    const attemptIndex = Number.parseInt(attemptCookie, 10) || 0;
+    const nextIndex = Math.min(attemptIndex + 1, FAILURE_MESSAGES.length - 1);
+    const messageIndex = Math.min(attemptIndex, FAILURE_MESSAGES.length - 1);
+
+    cookieStore.set({
+      name: ATTEMPT_COOKIE,
+      value: nextIndex.toString(),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: COOKIE_MAX_AGE,
+      path: '/'
+    });
+
+    return { error: FAILURE_MESSAGES[messageIndex] };
   }
 
-  const cookieStore = await cookies();
+  cookieStore.delete(ATTEMPT_COOKIE);
   cookieStore.set({
     name: AUTH_COOKIE,
     value: computeToken(expected),
