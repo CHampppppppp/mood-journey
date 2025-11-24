@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useFormStatus } from 'react-dom';
 import { authenticate, type AuthState } from '@/lib/auth';
 import { useToast } from './ToastProvider';
+import { useSafeActionState } from '@/app/hooks/useSafeActionState';
 
 const initialState: AuthState = {};
 
 export default function LoginForm() {
-  const [state, dispatch] = useFormState(authenticate, initialState);
+  const [state, dispatch] = useSafeActionState(authenticate, initialState);
   const { showToast } = useToast();
 
   useEffect(() => {

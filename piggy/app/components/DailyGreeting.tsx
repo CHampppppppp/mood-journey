@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 
@@ -23,53 +23,54 @@ const GREETINGS = [
 
 export default function DailyGreeting() {
   const [isVisible, setIsVisible] = useState(false);
-  const [shouldShow, setShouldShow] = useState(false);
-
-  // 使用 useMemo 保证同一天的问候语保持一致
-  const todayGreeting = useMemo(() => {
+  const [shouldShow, setShouldShow] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    const today = new Date().toDateString();
+    const lastShownDate = sessionStorage.getItem('piggy_greeting_shown');
+    return lastShownDate !== today;
+  });
+  const [todayGreeting] = useState<string | null>(() => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
     const today = new Date().toDateString();
     const savedDate = localStorage.getItem('piggy_greeting_date');
     const savedGreeting = localStorage.getItem('piggy_greeting_text');
 
-    // 如果是同一天且有保存的问候语，使用保存的
     if (savedDate === today && savedGreeting) {
       return savedGreeting;
     }
 
-    // 否则生成新的问候语
     const randomIndex = Math.floor(Math.random() * GREETINGS.length);
     const greeting = GREETINGS[randomIndex];
 
     localStorage.setItem('piggy_greeting_date', today);
     localStorage.setItem('piggy_greeting_text', greeting);
-
     return greeting;
-  }, []);
+  });
 
   useEffect(() => {
-    const today = new Date().toDateString();
-    const lastShownDate = sessionStorage.getItem('piggy_greeting_shown');
-
-    // 只在每天第一次打开时显示
-    if (lastShownDate !== today) {
-      setShouldShow(true);
-      // 延迟一点显示，让页面先加载
-      const timer = setTimeout(() => {
-        setIsVisible(true);
-      }, 500);
-
-      return () => clearTimeout(timer);
+    if (!shouldShow) {
+      return;
     }
-  }, []);
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [shouldShow]);
 
   const handleClose = () => {
     setIsVisible(false);
+    setShouldShow(false);
     // 记录今天已经显示过
     const today = new Date().toDateString();
     sessionStorage.setItem('piggy_greeting_shown', today);
   };
 
-  if (!shouldShow) return null;
+  if (!shouldShow || !todayGreeting) return null;
 
   return (
     <AnimatePresence>

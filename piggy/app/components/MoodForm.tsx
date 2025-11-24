@@ -43,12 +43,10 @@ MoodButton.displayName = 'MoodButton';
 
 // 优化的强度按钮组件
 const IntensityButton = memo(({ 
-  level, 
   isSelected, 
   onClick,
   label
 }: { 
-  level: number; 
   isSelected: boolean; 
   onClick: () => void;
   label: string;
@@ -123,7 +121,6 @@ function MoodForm({ onSuccess }: { onSuccess?: () => void }) {
                 {[0, 1, 2, 3].map((level) => (
                   <IntensityButton
                     key={level}
-                    level={level}
                     isSelected={intensity === level}
                     onClick={() => setIntensity(level)}
                     label={level === 0 ? '一点点' : level === 3 ? '超级' : String(level)}

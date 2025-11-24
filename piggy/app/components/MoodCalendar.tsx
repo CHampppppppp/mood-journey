@@ -68,16 +68,13 @@ function MoodCalendar({ moods }: MoodCalendarProps) {
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
 
   // Get all days in current month - memoized
-  const { monthStart, monthEnd, daysInMonth, emptyDays } = useMemo(() => {
+  const { daysInMonth, emptyDays } = useMemo(() => {
     const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-    const days = eachDayOfInterval({ start, end });
+    const days = eachDayOfInterval({ start, end: endOfMonth(currentMonth) });
     const startDay = getDay(start);
     const empty = Array.from({ length: startDay });
 
     return {
-      monthStart: start,
-      monthEnd: end,
       daysInMonth: days,
       emptyDays: empty
     };
@@ -208,7 +205,7 @@ function MoodCalendar({ moods }: MoodCalendarProps) {
             {selectedMood.note ? (
               <div className="bg-gradient-to-br from-pink-50 to-purple-50 p-4 rounded-2xl relative border border-pink-200/30">
                 <div className="absolute -top-2 left-4 w-4 h-4 bg-gradient-to-br from-pink-50 to-purple-50 rotate-45 border-l border-t border-pink-200/30" />
-                <p className="text-gray-700 text-sm leading-relaxed font-medium">"{selectedMood.note}"</p>
+                <p className="text-gray-700 text-sm leading-relaxed font-medium">&ldquo;{selectedMood.note}&rdquo;</p>
               </div>
             ) : (
               <p className="bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent text-sm italic text-center">没有写下笔记哦 ~</p>

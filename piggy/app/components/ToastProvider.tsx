@@ -31,14 +31,13 @@ export const useToast = () => useContext(ToastContext);
 
 export default function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [mounted, setMounted] = useState(false);
   const timers = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
-    setMounted(true);
+    const timersMap = timers.current;
     return () => {
-      timers.current.forEach((timeout) => clearTimeout(timeout));
-      timers.current.clear();
+      timersMap.forEach((timeout) => clearTimeout(timeout));
+      timersMap.clear();
     };
   }, []);
 
@@ -63,11 +62,12 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
   );
 
   const contextValue = useMemo(() => ({ showToast }), [showToast]);
+  const canRenderPortal = typeof document !== 'undefined';
 
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
-      {mounted &&
+      {canRenderPortal &&
         createPortal(
           <div className="pointer-events-none fixed inset-x-0 top-4 z-[9999] flex flex-col items-center gap-2 px-4">
             {toasts.map((toast) => (

@@ -1,16 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useFormStatus } from 'react-dom';
 import { recoverPassword, type RecoveryState } from '@/lib/auth';
 import { securityQuestions } from '@/lib/securityQuestions';
 import { useToast } from './ToastProvider';
+import { useSafeActionState } from '@/app/hooks/useSafeActionState';
 
 const initialRecoveryState: RecoveryState = {};
 
 export default function ForgotPasswordModal() {
     const [open, setOpen] = useState(false);
-    const [state, action] = useFormState(recoverPassword, initialRecoveryState);
+    const [state, action] = useSafeActionState(recoverPassword, initialRecoveryState);
     const { showToast } = useToast();
 
     useEffect(() => {
