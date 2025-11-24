@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Piggy's Mood Diary 🐷 ｜ Champ",
   description: "专门为宝宝做的心情日记",
+  icons: {
+    icon: "/heart.svg",
+  },
 };
 
 export default function RootLayout({
