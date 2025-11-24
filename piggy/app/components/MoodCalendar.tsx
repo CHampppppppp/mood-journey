@@ -175,10 +175,12 @@ function MoodCalendar({ moods }: MoodCalendarProps) {
             <div className="flex justify-between items-start mb-6">
               <div>
                 <p className="text-xs bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent font-medium mb-1">{format(new Date(selectedMood.created_at), 'yyyy年M月d日 HH:mm', { locale: zhCN })}</p>
-                <h3 className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mt-1 flex items-center gap-3">
-                  <span className="text-4xl">{getMoodEmoji(selectedMood.mood)}</span>
-                  {getMoodLabel(selectedMood.mood)}
-                </h3>
+                <div className="mt-1 flex items-center gap-3">
+                  <span className="text-4xl filter drop-shadow-sm">{getMoodEmoji(selectedMood.mood)}</span>
+                  <h3 className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+                    {getMoodLabel(selectedMood.mood)}
+                  </h3>
+                </div>
               </div>
               <button
                 onClick={() => setSelectedMood(null)}
