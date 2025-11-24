@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { saveMood } from '@/lib/actions';
 
-const MOODS = [
+export const MOODS = [
   { label: '开心', emoji: '😊', value: 'happy' },
   { label: '幸福', emoji: '🥰', value: 'blissful' },
   { label: '累', emoji: '😴', value: 'tired' },
@@ -12,28 +12,41 @@ const MOODS = [
   { label: '沮丧', emoji: '😔', value: 'depressed' },
 ];
 
-export default function MoodForm() {
+export default function MoodForm({ onSuccess }: { onSuccess?: () => void }) {
   const [selectedMood, setSelectedMood] = useState('');
   const [intensity, setIntensity] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (formData: FormData) => {
+      setIsSubmitting(true);
+      await saveMood(formData);
+      setIsSubmitting(false);
+      // Reset form state
+      setSelectedMood('');
+      setIntensity(0);
+      if (onSuccess) onSuccess();
+  };
 
   return (
-    <form action={saveMood} className="space-y-6 bg-white p-6 rounded-2xl shadow-md max-w-md w-full mx-auto border border-pink-100">
+    <form action={handleSubmit} className="space-y-6 w-full mx-auto">
       <div>
-        <label className="block text-lg font-medium text-gray-700 mb-3">今天心情怎么样呀？Piggy~</label>
+        <label className="block text-lg font-bold text-gray-800 mb-4 text-center">今天心情怎么样呀？Piggy~</label>
         <div className="grid grid-cols-3 gap-3">
           {MOODS.map((m) => (
             <button
               key={m.value}
               type="button"
               onClick={() => setSelectedMood(m.value)}
-              className={`flex flex-col items-center p-3 rounded-xl border transition-all ${
+              className={`flex flex-col items-center p-3 rounded-2xl border-2 transition-all duration-200 ${
                 selectedMood === m.value
-                  ? 'bg-pink-100 border-pink-500 scale-105'
-                  : 'bg-gray-50 border-gray-200 hover:bg-pink-50'
+                  ? 'bg-pink-50 border-pink-500 scale-105 shadow-md'
+                  : 'bg-gray-50 border-transparent hover:bg-pink-50 hover:border-pink-200'
               }`}
             >
-              <span className="text-3xl mb-1">{m.emoji}</span>
-              <span className="text-sm text-gray-600">{m.label}</span>
+              <span className="text-4xl mb-2 filter drop-shadow-sm">{m.emoji}</span>
+              <span className={`text-sm font-medium ${selectedMood === m.value ? 'text-pink-600' : 'text-gray-500'}`}>
+                {m.label}
+              </span>
             </button>
           ))}
         </div>
@@ -41,48 +54,50 @@ export default function MoodForm() {
       </div>
 
       {selectedMood && (
-        <div className="animate-fade-in">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            强烈程度 (0-3)
-          </label>
-          <div className="flex justify-between px-2">
-            {[0, 1, 2, 3].map((level) => (
-              <button
-                key={level}
-                type="button"
-                onClick={() => setIntensity(level)}
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold transition-colors ${
-                  intensity === level
-                    ? 'bg-pink-500 text-white shadow-lg'
-                    : 'bg-gray-100 text-gray-400 hover:bg-pink-200'
-                }`}
-              >
-                {level}
-              </button>
-            ))}
+        <div className="animate-fade-in space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-3 ml-1">
+                强烈程度
+            </label>
+            <div className="flex justify-between bg-gray-50 p-2 rounded-2xl">
+                {[0, 1, 2, 3].map((level) => (
+                <button
+                    key={level}
+                    type="button"
+                    onClick={() => setIntensity(level)}
+                    className={`flex-1 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-200 ${
+                    intensity === level
+                        ? 'bg-white text-pink-500 shadow-sm ring-2 ring-pink-100'
+                        : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                >
+                    {level === 0 ? '一点点' : level === 3 ? '超级' : level}
+                </button>
+                ))}
+            </div>
+            <input type="hidden" name="intensity" value={intensity} />
           </div>
-          <input type="hidden" name="intensity" value={intensity} />
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+              想说点什么吗？
+            </label>
+            <textarea
+              name="note"
+              rows={3}
+              className="w-full p-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-pink-300 outline-none transition-all resize-none text-gray-700 placeholder-gray-400"
+              placeholder="记录一下今天发生的小事..."
+            />
+          </div>
         </div>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          想说点什么吗？
-        </label>
-        <textarea
-          name="note"
-          rows={3}
-          className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-pink-300 focus:border-pink-500 outline-none transition-all"
-          placeholder="记录一下今天发生的小事..."
-        />
-      </div>
-
       <button
         type="submit"
-        disabled={!selectedMood}
-        className="w-full py-3 px-4 bg-pink-500 text-white font-semibold rounded-xl shadow-md hover:bg-pink-600 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        disabled={!selectedMood || isSubmitting}
+        className="w-full py-4 px-4 bg-gradient-to-r from-pink-500 to-pink-600 text-white font-bold text-lg rounded-2xl shadow-lg shadow-pink-200 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
       >
-        记录心情 ❤️
+        {isSubmitting ? '记录中...' : '确认记录 ❤️'}
       </button>
     </form>
   );
