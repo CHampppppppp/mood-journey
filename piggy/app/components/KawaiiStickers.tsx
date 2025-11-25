@@ -1,16 +1,83 @@
 'use client';
 
 import { memo } from 'react';
+import { motion, type Variants } from 'framer-motion';
+
+// 通用的贴纸悬浮动画配置
+const stickerVariants: Variants = {
+  initial: {
+    scale: 1,
+    rotate: 0,
+    filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))',
+  },
+  hover: {
+    scale: 1.2,
+    rotate: 5,
+    filter: 'drop-shadow(0 8px 16px rgba(0, 0, 0, 0.15))',
+    transition: {
+      type: 'spring',
+      stiffness: 300,
+      damping: 15,
+    },
+  },
+  tap: {
+    scale: 1.1,
+    rotate: -3,
+    transition: {
+      type: 'spring',
+      stiffness: 400,
+      damping: 10,
+    },
+  },
+};
+
+// 更活泼的弹跳动画
+const bouncyStickerVariants: Variants = {
+  initial: {
+    scale: 1,
+    rotate: 0,
+    y: 0,
+  },
+  hover: {
+    scale: 1.25,
+    rotate: [0, -5, 5, 0],
+    y: -5,
+    transition: {
+      scale: {
+        type: 'spring',
+        stiffness: 400,
+        damping: 10,
+      },
+      rotate: {
+        duration: 0.4,
+        ease: 'easeInOut',
+      },
+      y: {
+        type: 'spring',
+        stiffness: 300,
+        damping: 15,
+      },
+    },
+  },
+  tap: {
+    scale: 0.95,
+    y: 2,
+  },
+};
 
 // 可爱小猫贴纸 - 简约线条风格
 export const CatSticker = memo(({ className = '', size = 60 }: { className?: string; size?: number }) => (
-  <svg 
+  <motion.svg 
     width={size} 
     height={size} 
     viewBox="0 0 100 100" 
-    className={`sticker-hover ${className}`}
+    className={`cursor-pointer ${className}`}
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
+    variants={bouncyStickerVariants}
+    initial="initial"
+    whileHover="hover"
+    whileTap="tap"
   >
     {/* 猫耳朵 */}
     <path d="M25 35 L35 55 L45 35" stroke="#1a1a1a" strokeWidth="3" fill="#ffd6e7" strokeLinecap="round" strokeLinejoin="round"/>
@@ -36,20 +103,24 @@ export const CatSticker = memo(({ className = '', size = 60 }: { className?: str
     {/* 腮红 */}
     <ellipse cx="32" cy="65" rx="5" ry="3" fill="#ffb6d1" opacity="0.6"/>
     <ellipse cx="68" cy="65" rx="5" ry="3" fill="#ffb6d1" opacity="0.6"/>
-  </svg>
+  </motion.svg>
 ));
 
 CatSticker.displayName = 'CatSticker';
 
 // 可爱小狗贴纸 - 简约线条风格
 export const DogSticker = memo(({ className = '', size = 60 }: { className?: string; size?: number }) => (
-  <svg 
+  <motion.svg 
     width={size} 
     height={size} 
     viewBox="0 0 100 100" 
-    className={`sticker-hover ${className}`}
+    className={`cursor-pointer ${className}`}
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
+    variants={bouncyStickerVariants}
+    initial="initial"
+    whileHover="hover"
+    whileTap="tap"
   >
     {/* 垂耳朵 */}
     <ellipse cx="25" cy="50" rx="12" ry="20" fill="#ffd6e7" stroke="#1a1a1a" strokeWidth="3"/>
@@ -73,20 +144,24 @@ export const DogSticker = memo(({ className = '', size = 60 }: { className?: str
     <ellipse cx="70" cy="60" rx="5" ry="3" fill="#ffb6d1" opacity="0.6"/>
     {/* 舌头 */}
     <ellipse cx="50" cy="78" rx="5" ry="4" fill="#ffb6d1" stroke="#1a1a1a" strokeWidth="2"/>
-  </svg>
+  </motion.svg>
 ));
 
 DogSticker.displayName = 'DogSticker';
 
 // 爱心贴纸
 export const HeartSticker = memo(({ className = '', size = 40 }: { className?: string; size?: number }) => (
-  <svg 
+  <motion.svg 
     width={size} 
     height={size} 
     viewBox="0 0 100 100" 
-    className={`sticker-hover ${className}`}
+    className={`cursor-pointer ${className}`}
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
+    variants={stickerVariants}
+    initial="initial"
+    whileHover="hover"
+    whileTap="tap"
   >
     <path 
       d="M50 85 C20 60 10 40 25 25 C40 10 50 25 50 35 C50 25 60 10 75 25 C90 40 80 60 50 85Z" 
@@ -96,20 +171,33 @@ export const HeartSticker = memo(({ className = '', size = 40 }: { className?: s
     />
     {/* 高光 */}
     <ellipse cx="35" cy="35" rx="8" ry="5" fill="white" opacity="0.6" transform="rotate(-30 35 35)"/>
-  </svg>
+  </motion.svg>
 ));
 
 HeartSticker.displayName = 'HeartSticker';
 
-// 星星贴纸
+// 星星贴纸 - 带闪烁动画
 export const StarSticker = memo(({ className = '', size = 40 }: { className?: string; size?: number }) => (
-  <svg 
+  <motion.svg 
     width={size} 
     height={size} 
     viewBox="0 0 100 100" 
-    className={`sticker-hover animate-sparkle ${className}`}
+    className={`cursor-pointer ${className}`}
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
+    variants={stickerVariants}
+    initial="initial"
+    whileHover="hover"
+    whileTap="tap"
+    animate={{
+      scale: [1, 1.05, 1],
+      opacity: [1, 0.8, 1],
+    }}
+    transition={{
+      duration: 2,
+      repeat: Infinity,
+      ease: 'easeInOut',
+    }}
   >
     <path 
       d="M50 10 L58 40 L90 40 L65 58 L75 90 L50 70 L25 90 L35 58 L10 40 L42 40 Z" 
@@ -118,20 +206,24 @@ export const StarSticker = memo(({ className = '', size = 40 }: { className?: st
       strokeWidth="3"
       strokeLinejoin="round"
     />
-  </svg>
+  </motion.svg>
 ));
 
 StarSticker.displayName = 'StarSticker';
 
 // 肉球贴纸
 export const PawSticker = memo(({ className = '', size = 50 }: { className?: string; size?: number }) => (
-  <svg 
+  <motion.svg 
     width={size} 
     height={size} 
     viewBox="0 0 100 100" 
-    className={`sticker-hover ${className}`}
+    className={`cursor-pointer ${className}`}
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
+    variants={stickerVariants}
+    initial="initial"
+    whileHover="hover"
+    whileTap="tap"
   >
     {/* 主肉垫 */}
     <ellipse cx="50" cy="60" rx="22" ry="18" fill="#ffd6e7" stroke="#1a1a1a" strokeWidth="3"/>
@@ -139,20 +231,32 @@ export const PawSticker = memo(({ className = '', size = 50 }: { className?: str
     <ellipse cx="30" cy="35" rx="10" ry="12" fill="#ffd6e7" stroke="#1a1a1a" strokeWidth="3"/>
     <ellipse cx="50" cy="28" rx="10" ry="12" fill="#ffd6e7" stroke="#1a1a1a" strokeWidth="3"/>
     <ellipse cx="70" cy="35" rx="10" ry="12" fill="#ffd6e7" stroke="#1a1a1a" strokeWidth="3"/>
-  </svg>
+  </motion.svg>
 ));
 
 PawSticker.displayName = 'PawSticker';
 
-// 睡觉小猫贴纸
+// 睡觉小猫贴纸 - 带呼吸动画
 export const SleepyCatSticker = memo(({ className = '', size = 80 }: { className?: string; size?: number }) => (
-  <svg 
+  <motion.svg 
     width={size} 
     height={size} 
     viewBox="0 0 100 80" 
-    className={`sticker-hover ${className}`}
+    className={`cursor-pointer ${className}`}
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
+    variants={bouncyStickerVariants}
+    initial="initial"
+    whileHover="hover"
+    whileTap="tap"
+    animate={{
+      scaleY: [1, 1.02, 1],
+    }}
+    transition={{
+      duration: 2,
+      repeat: Infinity,
+      ease: 'easeInOut',
+    }}
   >
     {/* 身体 */}
     <ellipse cx="50" cy="55" rx="40" ry="20" fill="white" stroke="#1a1a1a" strokeWidth="3"/>
@@ -172,20 +276,24 @@ export const SleepyCatSticker = memo(({ className = '', size = 80 }: { className
     <text x="40" y="20" fill="#1a1a1a" fontSize="12" fontWeight="bold">z</text>
     <text x="48" y="15" fill="#1a1a1a" fontSize="10" fontWeight="bold">z</text>
     <text x="54" y="10" fill="#1a1a1a" fontSize="8" fontWeight="bold">z</text>
-  </svg>
+  </motion.svg>
 ));
 
 SleepyCatSticker.displayName = 'SleepyCatSticker';
 
-// 开心小狗贴纸
+// 开心小狗贴纸 - 带摇尾巴动画
 export const HappyDogSticker = memo(({ className = '', size = 70 }: { className?: string; size?: number }) => (
-  <svg 
+  <motion.svg 
     width={size} 
     height={size} 
     viewBox="0 0 100 100" 
-    className={`sticker-hover ${className}`}
+    className={`cursor-pointer ${className}`}
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
+    variants={bouncyStickerVariants}
+    initial="initial"
+    whileHover="hover"
+    whileTap="tap"
   >
     {/* 垂耳朵 */}
     <ellipse cx="22" cy="45" rx="10" ry="18" fill="#ffd6e7" stroke="#1a1a1a" strokeWidth="3"/>
@@ -204,27 +312,108 @@ export const HappyDogSticker = memo(({ className = '', size = 70 }: { className?
     {/* 腮红 */}
     <ellipse cx="30" cy="55" rx="4" ry="2" fill="#ffb6d1" opacity="0.7"/>
     <ellipse cx="70" cy="55" rx="4" ry="2" fill="#ffb6d1" opacity="0.7"/>
-    {/* 尾巴 (摇动效果通过动画实现) */}
-    <path d="M90 60 Q100 50 95 35" stroke="#1a1a1a" strokeWidth="3" fill="none" strokeLinecap="round"/>
-  </svg>
+    {/* 尾巴 (摇动效果通过 motion 实现) */}
+    <motion.path 
+      d="M90 60 Q100 50 95 35" 
+      stroke="#1a1a1a" 
+      strokeWidth="3" 
+      fill="none" 
+      strokeLinecap="round"
+      animate={{
+        d: [
+          "M90 60 Q100 50 95 35",
+          "M90 60 Q105 55 100 40",
+          "M90 60 Q100 50 95 35",
+        ],
+      }}
+      transition={{
+        duration: 0.5,
+        repeat: Infinity,
+        ease: 'easeInOut',
+      }}
+    />
+  </motion.svg>
 ));
 
 HappyDogSticker.displayName = 'HappyDogSticker';
 
-// 闪闪发光效果
+// 闪闪发光效果 - 使用 motion 实现
 export const Sparkles = memo(({ className = '' }: { className?: string }) => (
   <div className={`absolute pointer-events-none ${className}`}>
-    <div className="absolute -top-2 -left-2">
-      <StarSticker size={20} className="animate-sparkle" />
-    </div>
-    <div className="absolute top-0 right-0" style={{ animationDelay: '0.3s' }}>
-      <StarSticker size={15} className="animate-sparkle" />
-    </div>
-    <div className="absolute -bottom-2 left-1/2" style={{ animationDelay: '0.6s' }}>
-      <StarSticker size={18} className="animate-sparkle" />
-    </div>
+    <motion.div 
+      className="absolute -top-2 -left-2"
+      animate={{
+        scale: [1, 1.2, 1],
+        opacity: [0.8, 1, 0.8],
+      }}
+      transition={{
+        duration: 1.5,
+        repeat: Infinity,
+        ease: 'easeInOut',
+      }}
+    >
+      <StarSticker size={20} />
+    </motion.div>
+    <motion.div 
+      className="absolute top-0 right-0"
+      animate={{
+        scale: [1, 1.2, 1],
+        opacity: [0.8, 1, 0.8],
+      }}
+      transition={{
+        duration: 1.5,
+        repeat: Infinity,
+        ease: 'easeInOut',
+        delay: 0.3,
+      }}
+    >
+      <StarSticker size={15} />
+    </motion.div>
+    <motion.div 
+      className="absolute -bottom-2 left-1/2"
+      animate={{
+        scale: [1, 1.2, 1],
+        opacity: [0.8, 1, 0.8],
+      }}
+      transition={{
+        duration: 1.5,
+        repeat: Infinity,
+        ease: 'easeInOut',
+        delay: 0.6,
+      }}
+    >
+      <StarSticker size={18} />
+    </motion.div>
   </div>
 ));
 
 Sparkles.displayName = 'Sparkles';
 
+// 新增：浮动贴纸装饰组件 - 带有随机飘动效果
+export const FloatingSticker = memo(({ 
+  children, 
+  className = '',
+  delay = 0,
+}: { 
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) => (
+  <motion.div
+    className={`absolute ${className}`}
+    animate={{
+      y: [0, -10, 0],
+      rotate: [-2, 2, -2],
+    }}
+    transition={{
+      duration: 3,
+      repeat: Infinity,
+      ease: 'easeInOut',
+      delay,
+    }}
+  >
+    {children}
+  </motion.div>
+));
+
+FloatingSticker.displayName = 'FloatingSticker';
