@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, memo } from 'react';
+import { useState, memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, List as ListIcon, type LucideIcon, Plus, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -10,11 +10,116 @@ import MoodHistory from './MoodHistory';
 import MoodForm from './MoodForm';
 import { Mood, Period } from '@/lib/actions';
 import LogoutButton from './LogoutButton';
-import { 
+import {
   CatSticker, DogSticker, HeartSticker, PawSticker, SleepyCatSticker,
   SnakeSticker, CapybaraSticker, PandaSticker, BunnySticker, BirdSticker,
   BearSticker, DuckSticker, FrogSticker, CharacterAvatar, StarSticker
 } from './KawaiiStickers';
+
+// 动物贴纸配置
+const ANIMAL_STICKERS = [
+  { Component: SleepyCatSticker, minSize: 60, maxSize: 95 },
+  { Component: CatSticker, minSize: 55, maxSize: 80 },
+  { Component: DogSticker, minSize: 55, maxSize: 80 },
+  { Component: CapybaraSticker, minSize: 60, maxSize: 90 },
+  { Component: SnakeSticker, minSize: 50, maxSize: 75 },
+  { Component: PandaSticker, minSize: 55, maxSize: 80 },
+  { Component: BunnySticker, minSize: 50, maxSize: 70 },
+  { Component: BirdSticker, minSize: 45, maxSize: 65 },
+  { Component: BearSticker, minSize: 50, maxSize: 70 },
+  { Component: DuckSticker, minSize: 45, maxSize: 65 },
+  { Component: FrogSticker, minSize: 45, maxSize: 60 },
+];
+
+// 小装饰配置
+const SMALL_DECORATIONS = [
+  { Component: StarSticker, minSize: 25, maxSize: 40 },
+  { Component: HeartSticker, minSize: 28, maxSize: 45 },
+  { Component: PawSticker, minSize: 32, maxSize: 50 },
+];
+
+// 角色头像配置（排除情绪图片：angry.jpg, annoy.jpg, happiness.jpg）
+const CHARACTER_AVATARS = [
+  { src: '/luffy.jpg', alt: 'Luffy' },
+  { src: '/luffy2.jpg', alt: 'Luffy' },
+  { src: '/zoro.jpg', alt: 'Zoro' },
+  { src: '/L.jpg', alt: 'L' },
+  { src: '/misa.jpg', alt: 'Misa' },
+  { src: '/L and misa.jpg', alt: 'L and Misa' },
+  { src: '/akaza.jpg', alt: 'Akaza' },
+  { src: '/akaza2.jpg', alt: 'Akaza' },
+  { src: '/Kamado.jpg', alt: 'Kamado' },
+  { src: '/makima.jpg', alt: 'Makima' },
+  { src: '/paiqiushaonian.jpg', alt: '排球少年' },
+  { src: '/paiqiushaonian2.jpg', alt: '排球少年' },
+];
+
+// 生成不重叠的随机位置（针对 Dashboard 的边缘区域，考虑元素尺寸不超出视口）
+// maxElementSize: 元素最大尺寸（像素），用于计算安全边距
+function generateRandomPositions(count: number, maxElementSize: number = 100) {
+  const positions: { top: number; left: number; delay: number }[] = [];
+  const minDistance = 14; // 最小间距百分比
+  // 根据元素尺寸计算安全边距（假设视口约1000px，转换为百分比）
+  const safeMargin = Math.ceil(maxElementSize / 10); // 约等于元素尺寸的百分比
+
+  for (let i = 0; i < count; i++) {
+    let attempts = 0;
+    let validPosition = false;
+    let top = 0, left = 0;
+
+    while (!validPosition && attempts < 50) {
+      // 将屏幕分为边缘区域，避开中心手机框架区域，同时确保不超出视口
+      const zone = Math.floor(Math.random() * 4); // 0:左 1:右 2:上 3:下
+      switch (zone) {
+        case 0: // 左侧
+          left = Math.random() * 15 + 2;
+          top = Math.random() * (70 - safeMargin) + 10;
+          break;
+        case 1: // 右侧（留出元素宽度的空间）
+          left = Math.random() * 12 + (75 - safeMargin);
+          top = Math.random() * (70 - safeMargin) + 10;
+          break;
+        case 2: // 顶部
+          left = Math.random() * (45 - safeMargin) + 25;
+          top = Math.random() * 10 + 3;
+          break;
+        case 3: // 底部（留出元素高度的空间）
+          left = Math.random() * (45 - safeMargin) + 25;
+          top = Math.random() * 8 + (78 - safeMargin);
+          break;
+      }
+
+      // 检查与已有位置的距离
+      validPosition = positions.every(pos => {
+        const distance = Math.sqrt(
+          Math.pow(pos.left - left, 2) + Math.pow(pos.top - top, 2)
+        );
+        return distance >= minDistance;
+      });
+
+      attempts++;
+    }
+
+    positions.push({
+      top,
+      left,
+      delay: Math.random() * 2,
+    });
+  }
+
+  return positions;
+}
+
+// 随机选择数组中的元素
+function shuffleAndPick<T>(array: T[], count: number): T[] {
+  const shuffled = [...array].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+// 生成随机大小
+function randomSize(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
 // 动态导入欢迎语组件
 const DailyGreeting = dynamic(() => import('./DailyGreeting'), {
@@ -35,11 +140,10 @@ const TabButton = memo(({
 }) => (
   <button
     onClick={onClick}
-    className={`cursor-pointer flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-300 font-bold ${
-      isActive
+    className={`cursor-pointer flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-300 font-bold ${isActive
         ? 'bg-[#ffd6e7] text-black border-3 border-black shadow-[3px_3px_0_#1a1a1a]'
         : 'bg-white text-gray-500 border-3 border-transparent hover:border-black hover:bg-gray-50'
-    }`}
+      }`}
   >
     <Icon size={18} strokeWidth={2.5} />
     <span className="text-sm">{label}</span>
@@ -52,6 +156,44 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
   const [view, setView] = useState<'calendar' | 'history'>('calendar');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingMood, setEditingMood] = useState<Mood | null>(null);
+
+  // 生成随机装饰位置
+  const randomDecorations = useMemo(() => {
+    // 随机选择 7-9 个动物（最大尺寸约95px）
+    const animalCount = Math.floor(Math.random() * 3) + 7;
+    const selectedAnimals = shuffleAndPick(ANIMAL_STICKERS, animalCount);
+    const animalPositions = generateRandomPositions(animalCount, 100);
+
+    // 随机选择 3-5 个小装饰（最大尺寸约50px）
+    const decorCount = Math.floor(Math.random() * 3) + 3;
+    const smallDecorPositions = generateRandomPositions(decorCount, 55);
+
+    // 随机选择 4-6 个角色头像（最大尺寸约108px）
+    const avatarCount = Math.floor(Math.random() * 3) + 4;
+    const selectedAvatars = shuffleAndPick(CHARACTER_AVATARS, avatarCount);
+    const avatarPositions = generateRandomPositions(avatarCount, 115);
+
+    return {
+      animals: selectedAnimals.map((animal, i) => ({
+        ...animal,
+        size: randomSize(animal.minSize, animal.maxSize),
+        position: animalPositions[i],
+      })),
+      decorations: Array.from({ length: decorCount }, (_, i) => {
+        const decor = SMALL_DECORATIONS[Math.floor(Math.random() * SMALL_DECORATIONS.length)];
+        return {
+          ...decor,
+          size: randomSize(decor.minSize, decor.maxSize),
+          position: smallDecorPositions[i],
+        };
+      }),
+      avatars: selectedAvatars.map((avatar, i) => ({
+        ...avatar,
+        size: randomSize(81, 108),
+        position: avatarPositions[i],
+      })),
+    };
+  }, []);
 
   const handleEditMood = (mood: Mood) => {
     setEditingMood(mood);
@@ -72,83 +214,51 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
     <>
       <DailyGreeting />
       <div className="h-screen w-full bg-white pattern-dots sm:flex sm:items-center sm:justify-center overflow-hidden relative">
-        {/* 背景装饰贴纸 - 丰富的动物和人物 */}
+        {/* 随机背景装饰贴纸 */}
         <div className="absolute inset-0 pointer-events-none hidden sm:block">
-          {/* 左上区域 - 睡觉猫咪 */}
-          <div className="absolute top-8 left-8 animate-float">
-            <SleepyCatSticker size={90} />
-          </div>
-          
-          {/* 右上区域 - 卡皮巴拉 */}
-          <div className="absolute top-12 right-12 animate-float" style={{ animationDelay: '0.5s' }}>
-            <CapybaraSticker size={85} />
-          </div>
-          
-          {/* 左侧中部 - 熊猫 */}
-          <div className="absolute top-1/3 left-6 animate-float" style={{ animationDelay: '1s' }}>
-            <PandaSticker size={70} />
-          </div>
-          
-          {/* 右侧中部 - 小蛇 */}
-          <div className="absolute top-1/4 right-8 animate-float" style={{ animationDelay: '0.8s' }}>
-            <SnakeSticker size={65} />
-          </div>
-          
-          {/* 左下区域 - 小兔子 */}
-          <div className="absolute bottom-1/3 left-10 animate-float" style={{ animationDelay: '1.3s' }}>
-            <BunnySticker size={60} />
-          </div>
-          
-          {/* 右下区域 - 小狗 */}
-          <div className="absolute bottom-24 right-16 animate-float" style={{ animationDelay: '0.3s' }}>
-            <DogSticker size={75} />
-          </div>
-          
-          {/* 底部左侧 - 小鸟 */}
-          <div className="absolute bottom-16 left-20 animate-float" style={{ animationDelay: '1.6s' }}>
-            <BirdSticker size={55} />
-          </div>
-          
-          {/* 中下区域 - 青蛙 */}
-          <div className="absolute bottom-8 left-1/3 animate-float" style={{ animationDelay: '0.9s' }}>
-            <FrogSticker size={50} />
-          </div>
-          
-          {/* 右侧底部 - 小熊 */}
-          <div className="absolute bottom-1/4 right-6 animate-float" style={{ animationDelay: '1.1s' }}>
-            <BearSticker size={60} />
-          </div>
-          
-          {/* 散落的装饰 */}
-          <div className="absolute top-20 left-1/4">
-            <HeartSticker size={35} />
-          </div>
-          <div className="absolute top-1/2 right-1/4">
-            <PawSticker size={40} />
-          </div>
-          <div className="absolute bottom-1/2 left-16">
-            <StarSticker size={30} />
-          </div>
-          
-          {/* 圆形人物头像装饰 */}
-          <div className="absolute top-16 left-1/3 pointer-events-auto">
-            <CharacterAvatar src="/luffy.jpg" alt="Luffy" size={55} />
-          </div>
-          <div className="absolute top-1/4 right-1/3 pointer-events-auto">
-            <CharacterAvatar src="/L.jpg" alt="L" size={50} />
-          </div>
-          <div className="absolute bottom-20 left-1/4 pointer-events-auto">
-            <CharacterAvatar src="/zoro.jpg" alt="Zoro" size={52} />
-          </div>
-          <div className="absolute bottom-1/3 right-1/4 pointer-events-auto">
-            <CharacterAvatar src="/akaza.jpg" alt="Akaza" size={48} />
-          </div>
-          <div className="absolute top-1/2 left-8 pointer-events-auto">
-            <CharacterAvatar src="/Kamado.jpg" alt="Kamado" size={50} />
-          </div>
-          <div className="absolute bottom-12 right-1/3 pointer-events-auto">
-            <CharacterAvatar src="/misa.jpg" alt="Misa" size={45} />
-          </div>
+          {/* 动物贴纸 */}
+          {randomDecorations.animals.map((animal, index) => (
+            <div
+              key={`animal-${index}`}
+              className="absolute animate-float"
+              style={{
+                top: `${animal.position.top}%`,
+                left: `${animal.position.left}%`,
+                animationDelay: `${animal.position.delay}s`,
+              }}
+            >
+              <animal.Component size={animal.size} />
+            </div>
+          ))}
+
+          {/* 小装饰 */}
+          {randomDecorations.decorations.map((decor, index) => (
+            <div
+              key={`decor-${index}`}
+              className="absolute"
+              style={{
+                top: `${decor.position.top}%`,
+                left: `${decor.position.left}%`,
+              }}
+            >
+              <decor.Component size={decor.size} />
+            </div>
+          ))}
+
+          {/* 角色头像 */}
+          {randomDecorations.avatars.map((avatar, index) => (
+            <div
+              key={`avatar-${index}`}
+              className="absolute pointer-events-auto animate-float"
+              style={{
+                top: `${avatar.position.top}%`,
+                left: `${avatar.position.left}%`,
+                animationDelay: `${avatar.position.delay}s`,
+              }}
+            >
+              <CharacterAvatar src={avatar.src} alt={avatar.alt} size={avatar.size} />
+            </div>
+          ))}
         </div>
 
         {/* 主要手机框架容器 */}
@@ -159,13 +269,13 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
             <div className="absolute right-4 top-4">
               <LogoutButton />
             </div>
-            
+
             {/* 左上角Makima贴画 */}
             <div className="absolute left-4 top-3 w-14 h-14 rounded-full overflow-hidden border-3 border-black sticker-hover">
-              <Image 
-                src="/makima3.jpg" 
-                alt="Makima" 
-                width={56} 
+              <Image
+                src="/makima3.jpg"
+                alt="Makima"
+                width={56}
                 height={56}
                 className="w-full h-full object-cover"
               />
@@ -254,30 +364,28 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
                   animate={{ y: 0 }}
                   exit={{ y: "100%" }}
                   transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                  className="w-full max-w-md bg-white border-t-4 sm:border-4 border-black sm:rounded-3xl p-5 max-h-[85vh] overflow-y-auto sm:shadow-[6px_6px_0_#1a1a1a]"
+                  className="w-full max-w-sm bg-white border-t-4 sm:border-4 border-black sm:rounded-3xl px-4 py-3 sm:shadow-[6px_6px_0_#1a1a1a]"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* 拖拽指示条 (仅移动端) */}
-                  <div className="w-12 h-1.5 bg-black rounded-full mx-auto mb-4 sm:hidden" />
-                  
-                  {/* 头部 */}
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold manga-text-thin">
-                      {editingMood ? '修改心情' : '记录心情'}
-                    </h3>
-                    <button 
-                      onClick={handleCloseAdd} 
-                      className="cursor-pointer p-2 rounded-full border-3 border-black hover:bg-[#ffd6e7] transition-colors"
+                  <div className="w-10 h-1 bg-black rounded-full mx-auto mb-2 sm:hidden" />
+
+                  {/* 头部 - 带装饰猫咪 */}
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2">
+                      <CatSticker size={32} />
+                      <h3 className="text-lg font-bold manga-text-thin">
+                        {editingMood ? '修改心情' : '记录心情'}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={handleCloseAdd}
+                      className="cursor-pointer p-1.5 rounded-full border-2 border-black hover:bg-[#ffd6e7] transition-colors"
                     >
-                      <X size={20} strokeWidth={3} />
+                      <X size={16} strokeWidth={3} />
                     </button>
                   </div>
-                  
-                  {/* 装饰猫咪 */}
-                  <div className="flex justify-center mb-2">
-                    <CatSticker size={50} />
-                  </div>
-                  
+
                   <MoodForm onSuccess={handleCloseAdd} initialData={editingMood} />
                 </motion.div>
               </motion.div>

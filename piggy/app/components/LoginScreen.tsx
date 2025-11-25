@@ -1,115 +1,226 @@
+'use client';
+
+import { useMemo } from 'react';
 import LoginForm from './LoginForm';
 import ForgotPasswordModal from './ForgotPasswordModal';
-import { 
+import {
     CatSticker, DogSticker, HeartSticker, StarSticker, PawSticker,
     SnakeSticker, CapybaraSticker, PandaSticker, BunnySticker, BirdSticker,
     BearSticker, DuckSticker, FrogSticker, CharacterAvatar
 } from './KawaiiStickers';
 import Image from 'next/image';
 
+// 动物贴纸配置
+const ANIMAL_STICKERS = [
+    { Component: CatSticker, minSize: 50, maxSize: 80 },
+    { Component: DogSticker, minSize: 50, maxSize: 75 },
+    { Component: CapybaraSticker, minSize: 55, maxSize: 85 },
+    { Component: SnakeSticker, minSize: 45, maxSize: 70 },
+    { Component: PandaSticker, minSize: 50, maxSize: 75 },
+    { Component: BunnySticker, minSize: 45, maxSize: 70 },
+    { Component: BirdSticker, minSize: 40, maxSize: 60 },
+    { Component: BearSticker, minSize: 45, maxSize: 65 },
+    { Component: DuckSticker, minSize: 40, maxSize: 60 },
+    { Component: FrogSticker, minSize: 40, maxSize: 55 },
+];
+
+// 小装饰配置
+const SMALL_DECORATIONS = [
+    { Component: StarSticker, minSize: 20, maxSize: 35 },
+    { Component: HeartSticker, minSize: 25, maxSize: 40 },
+    { Component: PawSticker, minSize: 30, maxSize: 45 },
+];
+
+// 角色头像配置（排除情绪图片：angry.jpg, annoy.jpg, happiness.jpg）
+const CHARACTER_AVATARS = [
+    { src: '/luffy.jpg', alt: 'Luffy' },
+    { src: '/luffy2.jpg', alt: 'Luffy' },
+    { src: '/zoro.jpg', alt: 'Zoro' },
+    { src: '/L.jpg', alt: 'L' },
+    { src: '/misa.jpg', alt: 'Misa' },
+    { src: '/L and misa.jpg', alt: 'L and Misa' },
+    { src: '/akaza.jpg', alt: 'Akaza' },
+    { src: '/akaza2.jpg', alt: 'Akaza' },
+    { src: '/Kamado.jpg', alt: 'Kamado' },
+    { src: '/makima.jpg', alt: 'Makima' },
+    { src: '/paiqiushaonian.jpg', alt: '排球少年' },
+    { src: '/paiqiushaonian2.jpg', alt: '排球少年' },
+];
+
+// 生成不重叠的随机位置（考虑元素尺寸，确保不超出视口）
+// maxElementSize: 元素最大尺寸（像素），用于计算安全边距
+function generateRandomPositions(count: number, maxElementSize: number = 100, avoidCenter: boolean = true) {
+    const positions: { top: number; left: number; delay: number }[] = [];
+    const minDistance = 12; // 最小间距百分比
+    // 根据元素尺寸计算安全边距（假设视口约1000px，转换为百分比）
+    const safeMargin = Math.ceil(maxElementSize / 10); // 约等于元素尺寸的百分比
+
+    for (let i = 0; i < count; i++) {
+        let attempts = 0;
+        let validPosition = false;
+        let top = 0, left = 0;
+
+        while (!validPosition && attempts < 50) {
+            // 生成随机位置（避开中心登录区域）
+            if (avoidCenter) {
+                // 将屏幕分为边缘区域，同时确保不超出视口
+                const zone = Math.floor(Math.random() * 4); // 0:左 1:右 2:上 3:下
+                switch (zone) {
+                    case 0: // 左侧
+                        left = Math.random() * 15 + 2;
+                        top = Math.random() * (75 - safeMargin) + 5;
+                        break;
+                    case 1: // 右侧（留出元素宽度的空间）
+                        left = Math.random() * 15 + (78 - safeMargin);
+                        top = Math.random() * (75 - safeMargin) + 5;
+                        break;
+                    case 2: // 顶部
+                        left = Math.random() * (50 - safeMargin) + 20;
+                        top = Math.random() * 12 + 3;
+                        break;
+                    case 3: // 底部（留出元素高度的空间）
+                        left = Math.random() * (50 - safeMargin) + 20;
+                        top = Math.random() * 10 + (80 - safeMargin);
+                        break;
+                }
+            } else {
+                left = Math.random() * (85 - safeMargin) + 5;
+                top = Math.random() * (85 - safeMargin) + 5;
+            }
+
+            // 检查与已有位置的距离
+            validPosition = positions.every(pos => {
+                const distance = Math.sqrt(
+                    Math.pow(pos.left - left, 2) + Math.pow(pos.top - top, 2)
+                );
+                return distance >= minDistance;
+            });
+
+            attempts++;
+        }
+
+        positions.push({
+            top,
+            left,
+            delay: Math.random() * 2, // 随机动画延迟 0-2s
+        });
+    }
+
+    return positions;
+}
+
+// 随机选择数组中的元素
+function shuffleAndPick<T>(array: T[], count: number): T[] {
+    const shuffled = [...array].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, count);
+}
+
+// 生成随机大小
+function randomSize(min: number, max: number): number {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 export default function LoginScreen() {
+    // 使用 useMemo 确保每次组件挂载时生成随机位置，但不会在重渲染时改变
+    const randomDecorations = useMemo(() => {
+        // 随机选择 6-8 个动物（最大尺寸约80px）
+        const animalCount = Math.floor(Math.random() * 3) + 6;
+        const selectedAnimals = shuffleAndPick(ANIMAL_STICKERS, animalCount);
+        const animalPositions = generateRandomPositions(animalCount, 85);
+
+        // 随机选择 4-6 个小装饰（最大尺寸约45px）
+        const decorCount = Math.floor(Math.random() * 3) + 4;
+        const smallDecorPositions = generateRandomPositions(decorCount, 50);
+
+        // 随机选择 4-6 个角色头像（最大尺寸约85px）
+        const avatarCount = Math.floor(Math.random() * 3) + 4;
+        const selectedAvatars = shuffleAndPick(CHARACTER_AVATARS, avatarCount);
+        const avatarPositions = generateRandomPositions(avatarCount, 90);
+
+        return {
+            animals: selectedAnimals.map((animal, i) => ({
+                ...animal,
+                size: randomSize(animal.minSize, animal.maxSize),
+                position: animalPositions[i],
+            })),
+            decorations: Array.from({ length: decorCount }, (_, i) => {
+                const decor = SMALL_DECORATIONS[Math.floor(Math.random() * SMALL_DECORATIONS.length)];
+                return {
+                    ...decor,
+                    size: randomSize(decor.minSize, decor.maxSize),
+                    position: smallDecorPositions[i],
+                };
+            }),
+            avatars: selectedAvatars.map((avatar, i) => ({
+                ...avatar,
+                size: randomSize(65, 85),
+                position: avatarPositions[i],
+            })),
+        };
+    }, []);
+
     return (
         <div className="min-h-screen w-full bg-white pattern-dots flex items-center justify-center px-4 py-10 relative overflow-hidden">
-            {/* 装饰性贴纸 - 丰富的动物和人物 */}
+            {/* 随机装饰性贴纸 */}
             <div className="absolute inset-0 pointer-events-none">
-                {/* 左上角 - 可爱猫咪 */}
-                <div className="absolute top-8 left-8 animate-float">
-                    <CatSticker size={75} />
-                </div>
-                
-                {/* 右上角 - 卡皮巴拉 */}
-                <div className="absolute top-12 right-12 animate-float" style={{ animationDelay: '0.5s' }}>
-                    <CapybaraSticker size={80} />
-                </div>
-                
-                {/* 左侧中上 - 小蛇 */}
-                <div className="absolute top-1/4 left-6 animate-float" style={{ animationDelay: '0.8s' }}>
-                    <SnakeSticker size={60} />
-                </div>
-                
-                {/* 右侧中上 - 熊猫 */}
-                <div className="absolute top-1/3 right-8 animate-float" style={{ animationDelay: '1.2s' }}>
-                    <PandaSticker size={65} />
-                </div>
-                
-                {/* 左侧中下 - 小狗 */}
-                <div className="absolute bottom-1/3 left-10 animate-float" style={{ animationDelay: '1s' }}>
-                    <DogSticker size={70} />
-                </div>
-                
-                {/* 右侧中下 - 小兔子 */}
-                <div className="absolute bottom-1/4 right-6 animate-float" style={{ animationDelay: '0.3s' }}>
-                    <BunnySticker size={60} />
-                </div>
-                
-                {/* 左下角 - 小鸟 */}
-                <div className="absolute bottom-16 left-16 animate-float" style={{ animationDelay: '1.4s' }}>
-                    <BirdSticker size={50} />
-                </div>
-                
-                {/* 右下角 - 小熊 */}
-                <div className="absolute bottom-20 right-16 animate-float" style={{ animationDelay: '0.7s' }}>
-                    <BearSticker size={55} />
-                </div>
-                
-                {/* 底部中间 - 小鸭子 */}
-                <div className="absolute bottom-8 left-1/3 animate-float" style={{ animationDelay: '1.6s' }}>
-                    <DuckSticker size={50} />
-                </div>
-                
-                {/* 顶部中间 - 青蛙 */}
-                <div className="absolute top-6 left-1/3 animate-float" style={{ animationDelay: '0.9s' }}>
-                    <FrogSticker size={45} />
-                </div>
-                
-                {/* 散落的小装饰 */}
-                <div className="absolute top-1/4 left-1/4">
-                    <StarSticker size={28} />
-                </div>
-                <div className="absolute top-1/2 right-1/4">
-                    <HeartSticker size={35} />
-                </div>
-                <div className="absolute bottom-1/3 left-1/4">
-                    <PawSticker size={40} />
-                </div>
-                <div className="absolute top-2/3 right-1/3">
-                    <StarSticker size={25} />
-                </div>
-                
-                {/* 圆形人物头像装饰 - 带悬浮效果 */}
-                <div className="absolute top-20 left-1/4 pointer-events-auto">
-                    <CharacterAvatar src="/luffy.jpg" alt="Luffy" size={50} />
-                </div>
-                <div className="absolute top-1/3 right-1/4 pointer-events-auto">
-                    <CharacterAvatar src="/zoro.jpg" alt="Zoro" size={45} />
-                </div>
-                <div className="absolute bottom-1/4 left-1/5 pointer-events-auto">
-                    <CharacterAvatar src="/L.jpg" alt="L" size={48} />
-                </div>
-                <div className="absolute bottom-16 right-1/4 pointer-events-auto">
-                    <CharacterAvatar src="/akaza.jpg" alt="Akaza" size={52} />
-                </div>
-                <div className="absolute top-1/2 left-4 pointer-events-auto">
-                    <CharacterAvatar src="/Kamado.jpg" alt="Kamado" size={46} />
-                </div>
-                <div className="absolute bottom-1/2 right-4 pointer-events-auto">
-                    <CharacterAvatar src="/happiness.jpg" alt="Happiness" size={44} />
-                </div>
+                {/* 动物贴纸 */}
+                {randomDecorations.animals.map((animal, index) => (
+                    <div
+                        key={`animal-${index}`}
+                        className="absolute animate-float"
+                        style={{
+                            top: `${animal.position.top}%`,
+                            left: `${animal.position.left}%`,
+                            animationDelay: `${animal.position.delay}s`,
+                        }}
+                    >
+                        <animal.Component size={animal.size} />
+                    </div>
+                ))}
+
+                {/* 小装饰 */}
+                {randomDecorations.decorations.map((decor, index) => (
+                    <div
+                        key={`decor-${index}`}
+                        className="absolute"
+                        style={{
+                            top: `${decor.position.top}%`,
+                            left: `${decor.position.left}%`,
+                        }}
+                    >
+                        <decor.Component size={decor.size} />
+                    </div>
+                ))}
+
+                {/* 角色头像 */}
+                {randomDecorations.avatars.map((avatar, index) => (
+                    <div
+                        key={`avatar-${index}`}
+                        className="absolute pointer-events-auto animate-float"
+                        style={{
+                            top: `${avatar.position.top}%`,
+                            left: `${avatar.position.left}%`,
+                            animationDelay: `${avatar.position.delay}s`,
+                        }}
+                    >
+                        <CharacterAvatar src={avatar.src} alt={avatar.alt} size={avatar.size} />
+                    </div>
+                ))}
             </div>
 
             {/* 主卡片 */}
             <div className="w-full max-w-md card-manga rounded-3xl p-8 space-y-6 text-center relative z-10">
                 {/* Makima 贴画装饰 */}
                 <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full overflow-hidden border-4 border-black shadow-lg sticker-hover">
-                    <Image 
-                        src="/makima2.jpg" 
-                        alt="Makima" 
-                        width={80} 
+                    <Image
+                        src="/makima2.jpg"
+                        alt="Makima"
+                        width={80}
                         height={80}
                         className="w-full h-full object-cover"
                     />
                 </div>
-                
+
                 <div className="space-y-3">
                     {/* 漫画风格标题 */}
                     <p className="text-sm uppercase tracking-[0.4em] text-black font-bold">
@@ -131,7 +242,7 @@ export default function LoginScreen() {
                 </div>
 
                 <LoginForm />
-                
+
                 <div className="text-xs text-gray-500 space-y-2">
                     <ForgotPasswordModal />
                 </div>
