@@ -18,6 +18,7 @@ import { zhCN } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, X, Edit2 } from 'lucide-react';
 import { Mood, Period } from '@/lib/actions';
 import { MOODS } from './MoodForm';
+import { HeartSticker, PawSticker } from './KawaiiStickers';
 
 // Define prop type
 interface MoodCalendarProps {
@@ -26,7 +27,7 @@ interface MoodCalendarProps {
   onEditMood?: (mood: Mood) => void;
 }
 
-// 优化的日期格子组件
+// 优化的日期格子组件 - 漫画风格
 const DayCell = memo(({
   day,
   mood,
@@ -46,28 +47,36 @@ const DayCell = memo(({
     <button
       onClick={() => mood && onMoodClick(mood)}
       disabled={!mood}
-      className={`w-full h-full rounded-xl flex items-center justify-center text-lg transition-all duration-200
+      className={`w-full h-full rounded-xl flex items-center justify-center text-lg transition-all duration-200 border-2
         ${mood
-          ? 'bg-gradient-to-br from-white to-pink-50/30 hover:from-pink-50 hover:to-purple-50 hover:scale-105 cursor-pointer shadow-md border border-pink-200/50'
-          : 'text-gray-300 cursor-default'
+          ? 'bg-white border-black shadow-[2px_2px_0_#1a1a1a] hover:shadow-[4px_4px_0_#1a1a1a] hover:-translate-x-0.5 hover:-translate-y-0.5 cursor-pointer'
+          : 'border-transparent'
         }
-        ${!mood && isToday ? 'bg-gradient-to-br from-pink-50 to-purple-50 font-bold text-pink-500 ring-2 ring-pink-300 ring-inset shadow-inner' : ''}
-        ${isPeriod ? 'ring-2 ring-rose-300 bg-rose-50/50' : ''}
+        ${!mood && isToday 
+          ? 'bg-[#ffd6e7] font-bold text-black border-black border-dashed' 
+          : !mood ? 'text-gray-400' : ''
+        }
+        ${isPeriod && !mood ? 'bg-pink-50 border-pink-300 border-dashed' : ''}
+        ${isPeriod && mood ? 'ring-2 ring-pink-400 ring-offset-1' : ''}
       `}
     >
       {mood ? (
-        <span className="text-2xl filter drop-shadow-sm transform hover:scale-110 transition-transform" style={{ color: 'inherit' }}>
+        <span className="text-2xl kawaii-hover">
           {getMoodEmoji(mood.mood)}
         </span>
       ) : (
-        <span className={`text-sm ${isPeriod ? 'text-rose-400 font-medium' : ''}`}>{format(day, 'd')}</span>
+        <span className={`text-sm font-bold ${isPeriod ? 'text-pink-500' : ''}`}>
+          {format(day, 'd')}
+        </span>
       )}
     </button>
+    {/* 经期标记 */}
     {isPeriod && (
-      <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-rose-400 rounded-full" />
+      <span className="absolute -top-1 -right-1 w-3 h-3 bg-pink-400 rounded-full border-2 border-black" />
     )}
+    {/* 强烈情绪标记 */}
     {mood && mood.intensity >= 2 && (
-      <span className="absolute bottom-1 right-1 w-2 h-2 bg-gradient-to-br from-pink-400 to-purple-400 rounded-full border border-white shadow-sm" />
+      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#ffd6e7] rounded-full border-2 border-black" />
     )}
   </div>
 ));
@@ -78,7 +87,7 @@ function MoodCalendar({ moods, periods, onEditMood }: MoodCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
 
-  // Get all days in current month - memoized
+  // 获取当月所有天数 - memoized
   const { daysInMonth, emptyDays } = useMemo(() => {
     const start = startOfMonth(currentMonth);
     const days = eachDayOfInterval({ start, end: endOfMonth(currentMonth) });
@@ -91,9 +100,8 @@ function MoodCalendar({ moods, periods, onEditMood }: MoodCalendarProps) {
     };
   }, [currentMonth]);
 
-  // Helper to find mood for a specific day - memoized
+  // 辅助函数：查找特定日期的心情 - memoized
   const getMoodForDay = useMemo(() => {
-    // 创建日期到情绪的映射表，提高查找效率
     const moodMap = new Map<string, Mood>();
     moods.forEach(m => {
       const dateKey = format(new Date(m.created_at), 'yyyy-MM-dd');
@@ -108,13 +116,12 @@ function MoodCalendar({ moods, periods, onEditMood }: MoodCalendarProps) {
     };
   }, [moods]);
 
-  // Check if a day is within a period
+  // 检查某天是否在经期内
   const isPeriodDay = useCallback((day: Date) => {
     return periods.some(period => {
       const startDate = new Date(period.start_date);
-      // Normalize to start of day to avoid time issues
       const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-      const end = addDays(start, 6); // 6 days after start = 7 days total
+      const end = addDays(start, 6);
 
       return isWithinInterval(day, { start, end });
     });
@@ -135,23 +142,34 @@ function MoodCalendar({ moods, periods, onEditMood }: MoodCalendarProps) {
 
   return (
     <div className="w-full h-full flex flex-col">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-2 px-2 shrink-0">
-        <button onClick={handlePrevMonth} className="cursor-pointer p-2 hover:bg-gradient-to-r hover:from-pink-100 hover:to-purple-100 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent transition-all shadow-sm">
-          <ChevronLeft size={20} className="text-pink-500" />
+      {/* Header - 漫画风格 */}
+      <div className="flex justify-between items-center mb-3 px-2 shrink-0">
+        <button 
+          onClick={handlePrevMonth} 
+          className="cursor-pointer p-2 rounded-full border-3 border-black bg-white hover:bg-[#ffd6e7] transition-all shadow-[2px_2px_0_#1a1a1a] hover:shadow-[3px_3px_0_#1a1a1a] kawaii-hover"
+        >
+          <ChevronLeft size={20} strokeWidth={3} className="text-black" />
         </button>
-        <h2 className="text-lg font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+        <h2 className="text-xl font-bold manga-text-thin px-4 py-1 bg-[#ffd6e7] rounded-full border-3 border-black shadow-[3px_3px_0_#1a1a1a]">
           {format(currentMonth, 'yyyy年 M月', { locale: zhCN })}
         </h2>
-        <button onClick={handleNextMonth} className="cursor-pointer p-2 hover:bg-gradient-to-r hover:from-pink-100 hover:to-purple-100 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent transition-all shadow-sm">
-          <ChevronRight size={20} className="text-pink-500" />
+        <button 
+          onClick={handleNextMonth} 
+          className="cursor-pointer p-2 rounded-full border-3 border-black bg-white hover:bg-[#ffd6e7] transition-all shadow-[2px_2px_0_#1a1a1a] hover:shadow-[3px_3px_0_#1a1a1a] kawaii-hover"
+        >
+          <ChevronRight size={20} strokeWidth={3} className="text-black" />
         </button>
       </div>
 
-      {/* Days of Week */}
-      <div className="grid grid-cols-7 gap-1 mb-1 px-2 shrink-0">
-        {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-          <div key={day} className="text-center text-xs font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">
+      {/* Days of Week - 漫画风格 */}
+      <div className="grid grid-cols-7 gap-1 mb-2 px-2 shrink-0">
+        {['日', '一', '二', '三', '四', '五', '六'].map((day, index) => (
+          <div 
+            key={day} 
+            className={`text-center text-xs font-bold py-1 ${
+              index === 0 || index === 6 ? 'text-pink-500' : 'text-black'
+            }`}
+          >
             {day}
           </div>
         ))}
@@ -159,12 +177,12 @@ function MoodCalendar({ moods, periods, onEditMood }: MoodCalendarProps) {
 
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-1.5 p-2 flex-1 overflow-y-auto content-start">
-        {/* Empty slots for previous month */}
+        {/* 上个月的空位 */}
         {emptyDays.map((_, i) => (
           <div key={`empty-${i}`} />
         ))}
 
-        {/* Days */}
+        {/* 日期 */}
         {daysInMonth.map((day) => {
           const mood = getMoodForDay(day);
           const isPeriod = isPeriodDay(day);
@@ -184,22 +202,25 @@ function MoodCalendar({ moods, periods, onEditMood }: MoodCalendarProps) {
         })}
       </div>
 
-      {/* Detail Modal */}
+      {/* Detail Modal - 漫画风格 */}
       {selectedMood && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30"
           onClick={() => setSelectedMood(null)}
         >
           <div
-            className="bg-gradient-to-br from-white via-pink-50/30 to-purple-50/30 w-full max-w-xs rounded-3xl shadow-2xl p-6 transform scale-100 border-4 border-white/80 ring-1 ring-pink-200/50 animate-scale-in"
+            className="bg-white w-full max-w-xs rounded-3xl p-6 border-4 border-black shadow-[8px_8px_0_#1a1a1a] animate-bounce-in"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex justify-between items-start mb-6">
+            {/* 头部 */}
+            <div className="flex justify-between items-start mb-4">
               <div>
-                <p className="text-xs bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent font-medium mb-1">{format(new Date(selectedMood.created_at), 'yyyy年M月d日 HH:mm', { locale: zhCN })}</p>
-                <div className="mt-1 flex items-center gap-3">
-                  <span className="text-4xl filter drop-shadow-sm">{getMoodEmoji(selectedMood.mood)}</span>
-                  <h3 className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+                <p className="text-xs text-gray-500 font-bold mb-1">
+                  {format(new Date(selectedMood.created_at), 'yyyy年M月d日 HH:mm', { locale: zhCN })}
+                </p>
+                <div className="mt-2 flex items-center gap-3">
+                  <span className="text-4xl kawaii-hover">{getMoodEmoji(selectedMood.mood)}</span>
+                  <h3 className="text-2xl font-bold manga-text-thin">
                     {getMoodLabel(selectedMood.mood)}
                   </h3>
                 </div>
@@ -211,42 +232,54 @@ function MoodCalendar({ moods, periods, onEditMood }: MoodCalendarProps) {
                       onEditMood(selectedMood);
                       setSelectedMood(null);
                     }}
-                    className="cursor-pointer bg-gradient-to-br from-pink-100 to-purple-100 hover:from-pink-200 hover:to-purple-200 p-2 rounded-full text-pink-500 hover:text-pink-600 transition-colors"
+                    className="cursor-pointer p-2 rounded-full border-3 border-black bg-[#ffd6e7] hover:bg-pink-200 transition-colors kawaii-hover"
                   >
-                    <Edit2 size={20} />
+                    <Edit2 size={18} strokeWidth={2.5} />
                   </button>
                 )}
                 <button
                   onClick={() => setSelectedMood(null)}
-                  className="cursor-pointer bg-gradient-to-br from-pink-100 to-purple-100 hover:from-pink-200 hover:to-purple-200 p-2 rounded-full text-pink-500 hover:text-pink-600 transition-colors"
+                  className="cursor-pointer p-2 rounded-full border-3 border-black bg-white hover:bg-gray-100 transition-colors kawaii-hover"
                 >
-                  <X size={20} />
+                  <X size={18} strokeWidth={2.5} />
                 </button>
               </div>
             </div>
 
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">情绪强度</span>
+            {/* 情绪强度 */}
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <PawSticker size={20} />
+                <span className="text-xs font-bold uppercase tracking-wider text-black">情绪强度</span>
               </div>
               <div className="flex gap-2">
                 {[1, 2, 3].map((level) => (
                   <div
                     key={level}
-                    className={`flex-1 h-2 rounded-full transition-colors ${level <= selectedMood.intensity ? 'bg-gradient-to-r from-pink-400 to-purple-400' : 'bg-gray-100'
-                      }`}
+                    className={`flex-1 h-3 rounded-full border-2 border-black transition-colors ${
+                      level <= selectedMood.intensity 
+                        ? 'bg-[#ffd6e7]' 
+                        : 'bg-gray-100'
+                    }`}
                   />
                 ))}
               </div>
             </div>
 
+            {/* 笔记 */}
             {selectedMood.note ? (
-              <div className="bg-gradient-to-br from-pink-50 to-purple-50 p-4 rounded-2xl relative border border-pink-200/30">
-                <div className="absolute -top-2 left-4 w-4 h-4 bg-gradient-to-br from-pink-50 to-purple-50 rotate-45 border-l border-t border-pink-200/30" />
-                <p className="text-gray-700 text-sm leading-relaxed font-medium">&ldquo;{selectedMood.note}&rdquo;</p>
+              <div className="bg-[#ffd6e7] p-4 rounded-2xl border-3 border-black relative">
+                <div className="absolute -top-3 left-4">
+                  <HeartSticker size={24} />
+                </div>
+                <p className="text-black text-sm leading-relaxed font-medium pt-2">
+                  &ldquo;{selectedMood.note}&rdquo;
+                </p>
               </div>
             ) : (
-              <p className="bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent text-sm italic text-center">没有写下笔记哦 ~</p>
+              <p className="text-gray-400 text-sm italic text-center font-medium">
+                没有写下笔记哦 ~
+              </p>
             )}
           </div>
         </div>

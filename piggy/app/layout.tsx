@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Nunito, Comic_Neue } from "next/font/google";
 import "./globals.css";
 import ToastProvider from "./components/ToastProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// 圆润可爱的字体
+const nunito = Nunito({
+  variable: "--font-nunito",
   subsets: ["latin"],
+  weight: ["400", "600", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// 漫画风格字体
+const comicNeue = Comic_Neue({
+  variable: "--font-comic-neue",
   subsets: ["latin"],
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Mood Diary 🐷 ｜ Champ",
-  description: "专门为宝宝做的心情日记",
+  title: "Mood Diary 🐱 ｜ Kawaii Edition",
+  description: "超可爱的心情日记本 ♡",
   icons: {
     icon: "/heart.svg",
   },
@@ -28,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${nunito.variable} ${comicNeue.variable} antialiased`}>
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

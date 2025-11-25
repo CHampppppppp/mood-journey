@@ -4,6 +4,7 @@ import { useState, useCallback, memo } from 'react';
 import { saveMood, type Mood } from '@/lib/actions';
 import { useToast } from './ToastProvider';
 import { Droplet } from 'lucide-react';
+import { HeartSticker, PawSticker } from './KawaiiStickers';
 
 export const MOODS = [
   { label: '开心', emoji: '😊', value: 'happy' },
@@ -14,7 +15,7 @@ export const MOODS = [
   { label: '沮丧', emoji: '😔', value: 'depressed' },
 ];
 
-// 优化的心情按钮组件
+// 优化的心情按钮组件 - 漫画风格
 const MoodButton = memo(({
   mood,
   isSelected,
@@ -27,13 +28,14 @@ const MoodButton = memo(({
   <button
     type="button"
     onClick={onClick}
-    className={`cursor-pointer flex flex-col items-center p-2 rounded-2xl border-2 transition-all duration-200 ${isSelected
-      ? 'bg-gradient-to-br from-pink-50 to-purple-50 border-pink-400 scale-105 shadow-lg'
-      : 'bg-gradient-to-br from-gray-50 to-white border-transparent hover:from-pink-50 hover:to-purple-50 hover:border-pink-200'
-      }`}
+    className={`cursor-pointer flex flex-col items-center p-3 rounded-2xl border-3 transition-all duration-200 kawaii-hover ${
+      isSelected
+        ? 'bg-[#ffd6e7] border-black shadow-[4px_4px_0_#1a1a1a] -translate-x-0.5 -translate-y-0.5'
+        : 'bg-white border-gray-200 hover:border-black hover:shadow-[2px_2px_0_#1a1a1a]'
+    }`}
   >
-    <span className="text-3xl mb-1 filter drop-shadow-sm">{mood.emoji}</span>
-    <span className={`text-sm font-medium ${isSelected ? 'bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent' : 'text-gray-500'}`}>
+    <span className="text-3xl mb-1">{mood.emoji}</span>
+    <span className={`text-sm font-bold ${isSelected ? 'text-black' : 'text-gray-500'}`}>
       {mood.label}
     </span>
   </button>
@@ -41,7 +43,7 @@ const MoodButton = memo(({
 
 MoodButton.displayName = 'MoodButton';
 
-// 优化的强度按钮组件
+// 优化的强度按钮组件 - 漫画风格
 const IntensityButton = memo(({
   isSelected,
   onClick,
@@ -54,10 +56,11 @@ const IntensityButton = memo(({
   <button
     type="button"
     onClick={onClick}
-    className={`cursor-pointer flex-1 h-9 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-200 ${isSelected
-      ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-pink-600 shadow-md ring-2 ring-pink-200/50'
-      : 'text-gray-400 hover:text-gray-600'
-      }`}
+    className={`cursor-pointer flex-1 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-200 border-3 ${
+      isSelected
+        ? 'bg-[#ffd6e7] border-black text-black shadow-[2px_2px_0_#1a1a1a]'
+        : 'bg-white border-gray-200 text-gray-400 hover:border-black'
+    }`}
   >
     {label}
   </button>
@@ -74,27 +77,26 @@ function MoodForm({ onSuccess, initialData }: { onSuccess?: () => void, initialD
 
   const handleSubmit = useCallback(async (formData: FormData) => {
     if (!selectedMood) {
-      showToast('先选一个心情嘛，想抱抱你～ 💕', 'error');
+      showToast('先选一个心情嘛～ 💕', 'error');
       return;
     }
 
     setIsSubmitting(true);
     try {
       await saveMood(formData);
-      // Reset form state if not editing, or handle success
       if (!initialData) {
         setSelectedMood('');
         setIntensity(1);
         setIsPeriodStart(false);
-        showToast('记录好啦，我会一直陪着你 💖', 'success');
+        showToast('记录好啦！💖', 'success');
       } else {
-        showToast('修改好啦，爱你哦 💖', 'success');
+        showToast('修改好啦！💖', 'success');
       }
 
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error(error);
-      showToast('哎呀出错啦，再试一次好不好～', 'error');
+      showToast('哎呀出错啦，再试一次～', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -103,9 +105,14 @@ function MoodForm({ onSuccess, initialData }: { onSuccess?: () => void, initialD
   return (
     <form action={handleSubmit} className="space-y-4 w-full mx-auto">
       {initialData && <input type="hidden" name="id" value={initialData.id} />}
+      
       <div>
-        <label className="block text-lg font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-2 text-center">
-          {initialData ? '修改当时的心情' : '今天心情怎么样呀？宝宝~'}
+        <label className="flex items-center justify-center gap-2 text-lg font-bold text-black mb-3">
+          <PawSticker size={24} />
+          <span className="manga-text-thin">
+            {initialData ? '修改当时的心情' : '今天心情怎么样呀？'}
+          </span>
+          <PawSticker size={24} />
         </label>
         <div className="grid grid-cols-3 gap-2">
           {MOODS.map((m) => (
@@ -121,12 +128,14 @@ function MoodForm({ onSuccess, initialData }: { onSuccess?: () => void, initialD
       </div>
 
       {selectedMood && (
-        <div className="animate-fade-in space-y-3">
+        <div className="animate-fade-in space-y-4">
+          {/* 强烈程度 */}
           <div>
-            <label className="block text-sm font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-1 ml-1">
+            <label className="flex items-center gap-2 text-sm font-bold text-black mb-2 ml-1">
+              <HeartSticker size={18} />
               强烈程度
             </label>
-            <div className="flex justify-between bg-gradient-to-br from-pink-50/50 to-purple-50/50 p-1.5 rounded-2xl border border-pink-200/30">
+            <div className="flex gap-2 bg-gray-50 p-2 rounded-2xl border-3 border-gray-200">
               {[1, 2, 3].map((level) => (
                 <IntensityButton
                   key={level}
@@ -139,38 +148,36 @@ function MoodForm({ onSuccess, initialData }: { onSuccess?: () => void, initialD
             <input type="hidden" name="intensity" value={intensity} />
           </div>
 
+          {/* 笔记 */}
           <div>
-            <label className="block text-sm font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-1 ml-1">
+            <label className="flex items-center gap-2 text-sm font-bold text-black mb-2 ml-1">
+              <HeartSticker size={18} />
               想说点什么吗？
             </label>
             <textarea
               name="note"
               rows={3}
               defaultValue={initialData?.note || ''}
-              className="w-full p-3 bg-gradient-to-br from-pink-50/30 to-purple-50/30 border-2 border-pink-200/30 rounded-2xl focus:bg-white focus:border-pink-400 outline-none transition-all resize-none text-gray-700 placeholder-gray-400 text-sm"
+              className="input-manga w-full rounded-2xl resize-none text-gray-700 placeholder-gray-400 text-sm"
               placeholder="记录一下今天发生的小事..."
             />
           </div>
 
+          {/* 经期标记 */}
           {!initialData && (
             <div className="px-1">
-              <label className="flex items-center gap-2 cursor-pointer group">
+              <label className="flex items-center gap-3 cursor-pointer group">
                 <div className="relative flex items-center">
                   <input
                     type="checkbox"
                     name="is_period_start"
                     checked={isPeriodStart}
                     onChange={(e) => setIsPeriodStart(e.target.checked)}
-                    className="peer appearance-none w-5 h-5 border-2 border-pink-300 rounded-md checked:bg-rose-400 checked:border-rose-400 transition-colors cursor-pointer"
-                  />
-                  <Droplet
-                    size={12}
-                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100 pointer-events-none"
-                    fill="currentColor"
+                    className="checkbox-kawaii rounded-lg"
                   />
                 </div>
-                <span className="text-sm font-bold text-gray-600 group-hover:text-rose-500 transition-colors flex items-center gap-1">
-                  <Droplet size={16} className="text-rose-400" fill="currentColor" />
+                <span className="text-sm font-bold text-gray-600 group-hover:text-pink-500 transition-colors flex items-center gap-2">
+                  <Droplet size={16} className="text-pink-400" fill="currentColor" />
                   <span>来经期了</span>
                 </span>
               </label>
@@ -182,9 +189,20 @@ function MoodForm({ onSuccess, initialData }: { onSuccess?: () => void, initialD
       <button
         type="submit"
         disabled={!selectedMood || isSubmitting}
-        className="cursor-pointer w-full py-3 px-4 bg-gradient-to-r from-pink-400 via-pink-500 to-purple-500 text-white font-bold text-base rounded-2xl shadow-lg shadow-pink-300/50 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        className={`w-full py-3 px-4 font-bold text-base rounded-2xl transition-all ${
+          !selectedMood || isSubmitting
+            ? 'bg-gray-200 text-gray-400 border-3 border-gray-300 cursor-not-allowed'
+            : 'bg-[#ffd6e7] text-black border-3 border-black shadow-[4px_4px_0_#1a1a1a] hover:shadow-[6px_6px_0_#1a1a1a] hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-0 active:translate-y-0 active:shadow-[2px_2px_0_#1a1a1a]'
+        }`}
       >
-        {isSubmitting ? '保存中...' : (initialData ? '保存修改 ❤️' : '确认记录 ❤️')}
+        {isSubmitting ? (
+          <span className="flex items-center justify-center gap-2">
+            <span className="animate-spin">🐱</span>
+            保存中...
+          </span>
+        ) : (
+          <span>{initialData ? '保存修改 ♡' : '确认记录 ♡'}</span>
+        )}
       </button>
     </form>
   );

@@ -2,20 +2,22 @@
 
 import { useState, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Calendar as CalendarIcon, List as ListIcon, type LucideIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, List as ListIcon, type LucideIcon, Plus, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import MoodCalendar from './MoodCalendar';
 import MoodHistory from './MoodHistory';
 import MoodForm from './MoodForm';
 import { Mood, Period } from '@/lib/actions';
 import LogoutButton from './LogoutButton';
+import { CatSticker, DogSticker, HeartSticker, PawSticker, SleepyCatSticker } from './KawaiiStickers';
 
-// 动态导入欢迎语组件，因为它只在首次加载时需要
+// 动态导入欢迎语组件
 const DailyGreeting = dynamic(() => import('./DailyGreeting'), {
   ssr: false,
 });
 
-// 优化的切换按钮组件
+// 可爱风格的切换按钮组件
 const TabButton = memo(({
   isActive,
   onClick,
@@ -29,12 +31,13 @@ const TabButton = memo(({
 }) => (
   <button
     onClick={onClick}
-    className={`cursor-pointer flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${isActive
-      ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-pink-600 font-semibold shadow-sm'
-      : 'text-gray-400 hover:text-gray-600'
-      }`}
+    className={`cursor-pointer flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-300 font-bold ${
+      isActive
+        ? 'bg-[#ffd6e7] text-black border-3 border-black shadow-[3px_3px_0_#1a1a1a]'
+        : 'bg-white text-gray-500 border-3 border-transparent hover:border-black hover:bg-gray-50'
+    }`}
   >
-    <Icon size={18} />
+    <Icon size={18} strokeWidth={2.5} />
     <span className="text-sm">{label}</span>
   </button>
 ));
@@ -64,19 +67,53 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
   return (
     <>
       <DailyGreeting />
-      <div className="h-screen w-full bg-gradient-to-br from-pink-200 via-purple-200 to-pink-300 sm:flex sm:items-center sm:justify-center overflow-hidden">
-        <div className="w-full h-full sm:w-[420px] sm:h-[850px] sm:max-h-[95vh] bg-gradient-to-br from-pink-50 via-white to-purple-50 flex flex-col overflow-hidden relative sm:rounded-[30px] sm:shadow-2xl sm:border-[8px] sm:border-white/80 sm:ring-1 sm:ring-pink-200/50">
-          {/* Header */}
-          <header className="relative flex-none pt-8 pb-2 px-6 text-center bg-gradient-to-b from-white/80 via-pink-50/50 to-transparent z-10">
-            <div className="absolute right-6 top-6">
+      <div className="h-screen w-full bg-white pattern-dots sm:flex sm:items-center sm:justify-center overflow-hidden relative">
+        {/* 背景装饰贴纸 */}
+        <div className="absolute inset-0 pointer-events-none hidden sm:block">
+          <div className="absolute top-10 left-10 animate-float">
+            <SleepyCatSticker size={100} />
+          </div>
+          <div className="absolute bottom-20 right-10 animate-float" style={{ animationDelay: '0.7s' }}>
+            <DogSticker size={80} />
+          </div>
+          <div className="absolute top-1/3 right-20 animate-float" style={{ animationDelay: '1.2s' }}>
+            <HeartSticker size={50} />
+          </div>
+          <div className="absolute bottom-1/3 left-20">
+            <PawSticker size={40} />
+          </div>
+        </div>
+
+        {/* 主要手机框架容器 */}
+        <div className="w-full h-full sm:w-[420px] sm:h-[850px] sm:max-h-[95vh] bg-white flex flex-col overflow-hidden relative sm:rounded-[30px] sm:border-4 sm:border-black sm:shadow-[8px_8px_0_#1a1a1a]">
+          {/* Header - 漫画风格 */}
+          <header className="relative flex-none pt-8 pb-3 px-6 text-center bg-[#ffd6e7] border-b-4 border-black z-10">
+            {/* 右上角退出按钮 */}
+            <div className="absolute right-4 top-4">
               <LogoutButton />
             </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent tracking-tight">Piggy&apos;s Mood Diary 🐷</h1>
-            <p className="text-xs bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent mt-1 font-medium">记录老婆的每一天 ✨</p>
+            
+            {/* 左上角Makima贴画 */}
+            <div className="absolute left-4 top-3 w-14 h-14 rounded-full overflow-hidden border-3 border-black sticker-hover">
+              <Image 
+                src="/makima3.jpg" 
+                alt="Makima" 
+                width={56} 
+                height={56}
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            <h1 className="text-2xl manga-text">
+              Piggy&apos;s Diary 🐱
+            </h1>
+            <p className="text-xs text-black font-bold mt-1 tracking-wide">
+              ★ 记录老婆的每一天 ★
+            </p>
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-y-auto p-2 pb-28 scrollbar-hide">
+          <main className="flex-1 overflow-y-auto p-3 pb-32 scrollbar-hide bg-white">
             <AnimatePresence mode="wait">
               {view === 'calendar' ? (
                 <motion.div
@@ -84,7 +121,7 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
                   className="h-full"
                 >
                   <MoodCalendar moods={moods} periods={periods} onEditMood={handleEditMood} />
@@ -95,7 +132,7 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
                   className="pb-20"
                 >
                   <MoodHistory moods={moods} />
@@ -104,39 +141,21 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
             </AnimatePresence>
           </main>
 
-          {/* Bottom Controls */}
-          <div className="flex-none absolute bottom-8 left-0 right-0 flex flex-col items-center gap-4 z-20 pointer-events-none">
-
-            {/* Heart-shaped FAB */}
+          {/* Bottom Controls - 漫画风格 */}
+          <div className="flex-none absolute bottom-6 left-0 right-0 flex flex-col items-center gap-4 z-20 pointer-events-none">
+            {/* 添加按钮 - 可爱肉球风格 */}
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              whileTap={{ scale: 0.9 }}
               onClick={handleOpenAdd}
-              className="cursor-pointer pointer-events-auto relative w-16 h-16 flex items-center justify-center"
+              className="cursor-pointer pointer-events-auto relative w-16 h-16 flex items-center justify-center bg-[#ffd6e7] rounded-full border-4 border-black shadow-[4px_4px_0_#1a1a1a] hover:shadow-[6px_6px_0_#1a1a1a] transition-shadow"
               aria-label="添加心情记录"
             >
-              {/* 白色外层爱心 */}
-              <Heart
-                size={64}
-                className="absolute text-white fill-white"
-                style={{
-                  filter: 'drop-shadow(0 10px 25px rgba(236, 72, 153, 0.5))'
-                }}
-              />
-              {/* 粉色渐变内层爱心 */}
-              <Heart
-                size={56}
-                className="absolute text-pink-400 fill-pink-400"
-                style={{
-                  filter: 'drop-shadow(0 2px 8px rgba(236, 72, 153, 0.3))'
-                }}
-              />
-              {/* 白色加号 */}
-              <span className="relative text-white text-xl font-bold z-10" style={{ marginTop: '-2px' }}>+</span>
+              <Plus size={32} strokeWidth={3} className="text-black" />
             </motion.button>
 
-            {/* Switch Tabs */}
-            <div className="pointer-events-auto bg-white/95 backdrop-blur-xl shadow-lg rounded-full p-1.5 flex gap-2 border border-pink-200/50">
+            {/* Switch Tabs - 漫画风格 */}
+            <div className="pointer-events-auto bg-white border-4 border-black rounded-full p-1.5 flex gap-2 shadow-[4px_4px_0_#1a1a1a]">
               <TabButton
                 isActive={view === 'calendar'}
                 onClick={() => setView('calendar')}
@@ -152,7 +171,7 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
             </div>
           </div>
 
-          {/* Add Mood Modal */}
+          {/* Add Mood Modal - 漫画风格 */}
           <AnimatePresence>
             {isAddOpen && (
               <motion.div
@@ -160,7 +179,7 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+                className="absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30"
                 onClick={handleCloseAdd}
               >
                 <motion.div
@@ -168,16 +187,30 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
                   animate={{ y: 0 }}
                   exit={{ y: "100%" }}
                   transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                  className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 max-h-[85vh] overflow-y-auto shadow-2xl"
+                  className="w-full max-w-md bg-white border-t-4 sm:border-4 border-black sm:rounded-3xl p-5 max-h-[85vh] overflow-y-auto sm:shadow-[6px_6px_0_#1a1a1a]"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4 sm:hidden opacity-50" />
-                  <div className="flex justify-between items-center mb-4 sm:hidden">
-                    <h3 className="text-lg font-bold text-gray-800">{editingMood ? '修改心情' : '记录心情'}</h3>
-                    <button onClick={handleCloseAdd} className="cursor-pointer text-gray-400 p-2">
-                      关闭
+                  {/* 拖拽指示条 (仅移动端) */}
+                  <div className="w-12 h-1.5 bg-black rounded-full mx-auto mb-4 sm:hidden" />
+                  
+                  {/* 头部 */}
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold manga-text-thin">
+                      {editingMood ? '修改心情' : '记录心情'}
+                    </h3>
+                    <button 
+                      onClick={handleCloseAdd} 
+                      className="cursor-pointer p-2 rounded-full border-3 border-black hover:bg-[#ffd6e7] transition-colors"
+                    >
+                      <X size={20} strokeWidth={3} />
                     </button>
                   </div>
+                  
+                  {/* 装饰猫咪 */}
+                  <div className="flex justify-center mb-2">
+                    <CatSticker size={50} />
+                  </div>
+                  
                   <MoodForm onSuccess={handleCloseAdd} initialData={editingMood} />
                 </motion.div>
               </motion.div>
@@ -188,4 +221,3 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
     </>
   );
 }
-

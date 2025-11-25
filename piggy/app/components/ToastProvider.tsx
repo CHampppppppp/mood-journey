@@ -68,6 +68,30 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
 
   const contextValue = useMemo(() => ({ showToast }), [showToast]);
 
+  // 根据变体获取样式
+  const getToastStyle = (variant: ToastVariant) => {
+    switch (variant) {
+      case 'error':
+        return 'bg-white border-black';
+      case 'success':
+        return 'bg-[#ffd6e7] border-black';
+      default:
+        return 'bg-white border-black';
+    }
+  };
+
+  // 根据变体获取图标
+  const getToastIcon = (variant: ToastVariant) => {
+    switch (variant) {
+      case 'error':
+        return '😿';
+      case 'success':
+        return '😻';
+      default:
+        return '🐱';
+    }
+  };
+
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
@@ -77,22 +101,10 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
             {toasts.map((toast) => (
               <div
                 key={toast.id}
-                className={`w-full max-w-xs rounded-2xl px-4 py-3 shadow-lg shadow-pink-200/50 ring-1 ring-white/70 backdrop-blur ${
-                  toast.variant === 'error'
-                    ? 'bg-gradient-to-r from-rose-200 to-pink-100 text-rose-700'
-                    : toast.variant === 'success'
-                      ? 'bg-gradient-to-r from-emerald-200 to-green-100 text-emerald-700'
-                      : 'bg-gradient-to-r from-purple-200 to-pink-100 text-purple-700'
-                }`}
+                className={`w-full max-w-xs rounded-2xl px-4 py-3 border-3 shadow-[4px_4px_0_#1a1a1a] animate-bounce-in ${getToastStyle(toast.variant)}`}
               >
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <span>
-                    {toast.variant === 'error'
-                      ? '💔'
-                      : toast.variant === 'success'
-                        ? '💖'
-                        : '✨'}
-                  </span>
+                <div className="flex items-center gap-2 text-sm font-bold text-black">
+                  <span className="text-lg">{getToastIcon(toast.variant)}</span>
                   <p>{toast.message}</p>
                 </div>
               </div>
@@ -103,5 +115,3 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
     </ToastContext.Provider>
   );
 }
-
-
