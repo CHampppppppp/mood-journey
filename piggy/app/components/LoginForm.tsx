@@ -13,30 +13,58 @@ export default function LoginForm() {
   const { showToast } = useToast();
   const [dbLocked, setDbLocked] = useState(false);
   const [lockMessage, setLockMessage] = useState('');
-
-  useEffect(() => {
-    const checkLock = async () => {
-      const status = await getAccountLockStatus();
-      if (status.isLocked && status.lockedUntil) {
-        setDbLocked(true);
-        const remainingMinutes = Math.ceil((status.lockedUntil - Date.now()) / 60000);
-        setLockMessage(`当前账号被保护啦，${remainingMinutes}分钟后再试试~`);
-      } else {
-        setDbLocked(false);
-        setLockMessage('');
-      }
-    };
-
-    checkLock();
-    const interval = setInterval(checkLock, 3000); // Poll every 3 seconds
-    return () => clearInterval(interval);
-  }, []);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
 
   useEffect(() => {
     if (state?.error) {
       showToast(state.error, 'error');
     }
-  }, [showToast, state?.error]);
+    if (state?.lockedUntil) {
+      setLockedUntil(state.lockedUntil);
+    }
+  }, [showToast, state]);
+
+  useEffect(() => {
+    const checkLock = async () => {
+      if (lockedUntil && lockedUntil > Date.now()) return;
+
+      const status = await getAccountLockStatus();
+      if (status.isLocked && status.lockedUntil) {
+        setLockedUntil(status.lockedUntil);
+      } else {
+        setLockedUntil(null);
+      }
+    };
+
+    checkLock();
+    const interval = setInterval(checkLock, 5000);
+    return () => clearInterval(interval);
+  }, [lockedUntil]);
+
+  useEffect(() => {
+    if (!lockedUntil) {
+      setDbLocked(false);
+      setLockMessage('');
+      return;
+    }
+
+    const updateCountdown = () => {
+      const remaining = lockedUntil - Date.now();
+      if (remaining > 0) {
+        setDbLocked(true);
+        const minutes = Math.ceil(remaining / 60000);
+        setLockMessage(`当前账号被保护啦，${minutes}分钟后再试试~`);
+      } else {
+        setDbLocked(false);
+        setLockMessage('');
+        setLockedUntil(null);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [lockedUntil]);
 
   const locked = Boolean(state?.locked) || dbLocked;
 
