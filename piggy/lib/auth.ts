@@ -9,10 +9,15 @@ import { securityQuestions } from '@/lib/securityQuestions';
 
 const AUTH_COOKIE = 'piggy-auth';
 const ATTEMPT_COOKIE = 'piggy-auth-attempts';
+const SECURITY_ATTEMPT_COOKIE = 'piggy-security-attempts';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 const MAX_ATTEMPTS_BEFORE_LOCK = 6;
+const MAX_SECURITY_ATTEMPTS_BEFORE_LOCK = 3; // 密保只允许3次错误
 const BASE_LOCK_MINUTES = 15;
 const LOCK_ESCALATION_MINUTES = 30;
+
+// 锁定类型
+type LockType = 'password' | 'security';
 
 const FAILURE_MESSAGES = [
   '密码打错啦，手抖了嘛宝宝？',
@@ -31,40 +36,57 @@ type AttemptState = {
   securityAttempted?: boolean;
 };
 
+// 密保尝试状态（独立于密码尝试）
+type SecurityAttemptState = {
+  count: number;
+  lockEscalation: number;
+  lockedUntil?: number;
+};
+
 const INITIAL_ATTEMPT_STATE: AttemptState = {
   count: 0,
   messageIndex: 0,
   lockEscalation: 0,
 };
 
-async function setAccountLock(minutes: number, reason: string) {
+const INITIAL_SECURITY_ATTEMPT_STATE: SecurityAttemptState = {
+  count: 0,
+  lockEscalation: 0,
+};
+
+// 设置锁定，支持指定锁定类型
+async function setAccountLock(minutes: number, reason: string, lockType: LockType = 'password') {
   try {
     await pool.query(
-      `INSERT INTO account_locks (locked_at, duration_minutes, reason)
-       VALUES (NOW(), $1, $2)`,
-      [minutes, reason]
+      `INSERT INTO account_locks (locked_at, duration_minutes, reason, lock_type)
+       VALUES (NOW(), $1, $2, $3)`,
+      [minutes, reason, lockType]
     );
   } catch (error) {
     console.error('Failed to record account lock:', error);
   }
 }
 
-async function clearAccountLock() {
+// 清除密码锁定（通过插入 duration: 0 的记录）
+async function clearPasswordLock() {
   try {
     await pool.query(
-      `INSERT INTO account_locks (locked_at, duration_minutes, reason)
-       VALUES (NOW(), 0, 'Unlocked via security questions')`
+      `INSERT INTO account_locks (locked_at, duration_minutes, reason, lock_type)
+       VALUES (NOW(), 0, 'Unlocked via security questions', 'password')`
     );
   } catch (error) {
-    console.error('Failed to clear account lock:', error);
+    console.error('Failed to clear password lock:', error);
   }
 }
 
-export async function getAccountLockStatus() {
+// 获取指定类型的锁定状态
+export async function getAccountLockStatus(lockType: LockType = 'password') {
   try {
     const { rows } = await pool.query(
       `SELECT locked_at, duration_minutes FROM account_locks 
-       ORDER BY locked_at DESC LIMIT 1`
+       WHERE lock_type = $1
+       ORDER BY locked_at DESC LIMIT 1`,
+      [lockType]
     );
 
     if (rows.length === 0) {
@@ -184,8 +206,8 @@ export async function authenticate(
   const cookieStore = await cookies();
   const attemptState = readAttemptState(cookieStore.get(ATTEMPT_COOKIE)?.value);
   
-  // Check DB lock first
-  const dbLock = await getAccountLockStatus();
+  // Check DB lock first (only password lock)
+  const dbLock = await getAccountLockStatus('password');
   if (dbLock.isLocked && dbLock.lockedUntil) {
     return {
       error: formatLockRemainingMessage(dbLock.lockedUntil),
@@ -242,7 +264,7 @@ export async function authenticate(
 
     if (attemptState.count > MAX_ATTEMPTS_BEFORE_LOCK) {
       const minutes = applyLock(attemptState);
-      await setAccountLock(minutes, 'Password retry limit exceeded');
+      await setAccountLock(minutes, 'Password retry limit exceeded', 'password');
 
       cookieStore.set({
         name: ATTEMPT_COOKIE,
@@ -295,27 +317,73 @@ export async function logout() {
   redirect('/');
 }
 
+// 读取密保尝试状态
+function readSecurityAttemptState(rawValue?: string): SecurityAttemptState {
+  if (!rawValue) {
+    return { ...INITIAL_SECURITY_ATTEMPT_STATE };
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    return {
+      count: typeof parsed.count === 'number' ? parsed.count : 0,
+      lockEscalation:
+        typeof parsed.lockEscalation === 'number' ? parsed.lockEscalation : 0,
+      lockedUntil:
+        typeof parsed.lockedUntil === 'number' ? parsed.lockedUntil : undefined,
+    };
+  } catch {
+    return { ...INITIAL_SECURITY_ATTEMPT_STATE };
+  }
+}
+
+function serializeSecurityAttemptState(state: SecurityAttemptState) {
+  return JSON.stringify(state);
+}
+
+// 应用密保锁定
+function applySecurityLock(state: SecurityAttemptState) {
+  const minutes = lockDurationMinutes(state.lockEscalation);
+  state.lockEscalation += 1;
+  state.lockedUntil = Date.now() + minutes * 60 * 1000;
+  state.count = 0;
+  return minutes;
+}
+
 export async function recoverPassword(
   _: RecoveryState,
   formData: FormData
 ): Promise<RecoveryState> {
   const cookieStore = await cookies();
-  const attemptState = readAttemptState(cookieStore.get(ATTEMPT_COOKIE)?.value);
   
-  // We allow password recovery even if account is locked.
-  // However, we still check if they already used their one chance at security questions during this lock.
+  // 读取密保独立的尝试状态
+  const securityAttemptState = readSecurityAttemptState(
+    cookieStore.get(SECURITY_ATTEMPT_COOKIE)?.value
+  );
+  
+  // 检查密保是否被锁定（独立于密码锁定）
+  const securityDbLock = await getAccountLockStatus('security');
+  if (securityDbLock.isLocked && securityDbLock.lockedUntil) {
+    return { 
+      error: `密保功能被锁定了，${Math.ceil((securityDbLock.lockedUntil - Date.now()) / 60000)}分钟后再试~` 
+    };
+  }
+  
+  // 检查 cookie 中的密保锁定
+  const securityLockActive =
+    typeof securityAttemptState.lockedUntil === 'number' &&
+    securityAttemptState.lockedUntil > Date.now();
 
-  if (attemptState.lockedUntil && attemptState.lockedUntil <= Date.now()) {
-    // Lock expired, clear timestamp
-    delete attemptState.lockedUntil;
-    // We don't update cookie here yet, will do it at end or if security check fails
+  if (securityLockActive) {
+    return { 
+      error: `密保功能被锁定了，${Math.ceil((securityAttemptState.lockedUntil! - Date.now()) / 60000)}分钟后再试~` 
+    };
   }
 
-  if (attemptState.securityAttempted) {
-    return { error: '密保机会已经用过啦，等解锁后再来~' };
+  // 如果锁定已过期，清除时间戳
+  if (securityAttemptState.lockedUntil) {
+    delete securityAttemptState.lockedUntil;
   }
-
-  attemptState.securityAttempted = true;
 
   const configuredPassword = process.env.GIRLFRIEND_PASSWORD;
   if (!configuredPassword) {
@@ -330,12 +398,29 @@ export async function recoverPassword(
   if (!allCorrect) {
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    const minutes = applyLock(attemptState);
-    await setAccountLock(minutes, 'Security question failed');
+    securityAttemptState.count += 1;
+
+    // 密保错误次数超限，锁定密保功能
+    if (securityAttemptState.count >= MAX_SECURITY_ATTEMPTS_BEFORE_LOCK) {
+      const minutes = applySecurityLock(securityAttemptState);
+      await setAccountLock(minutes, 'Security question failed', 'security');
+      
+      cookieStore.set({
+        name: SECURITY_ATTEMPT_COOKIE,
+        value: serializeSecurityAttemptState(securityAttemptState),
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: COOKIE_MAX_AGE,
+        path: '/',
+      });
+
+      return { error: `密保答错太多次了，密保功能被锁${minutes}分钟~` };
+    }
     
     cookieStore.set({
-      name: ATTEMPT_COOKIE,
-      value: serializeAttemptState(attemptState),
+      name: SECURITY_ATTEMPT_COOKIE,
+      value: serializeSecurityAttemptState(securityAttemptState),
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -343,18 +428,31 @@ export async function recoverPassword(
       path: '/',
     });
 
-    return { error: '密保回答错啦，账号已经进入保护，稍后再试~' };
+    const remaining = MAX_SECURITY_ATTEMPTS_BEFORE_LOCK - securityAttemptState.count;
+    return { error: `密保回答错啦，还有${remaining}次机会~` };
   }
 
-  // Success - Clear locks
-  await clearAccountLock();
+  // 密保验证成功！
+  // 1. 清除密码锁定（通过插入 duration: 0 的记录）
+  await clearPasswordLock();
 
-  // Reset all attempts on successful recovery
-  const newState = { ...INITIAL_ATTEMPT_STATE };
-
+  // 2. 重置密码尝试状态
+  const newPasswordState = { ...INITIAL_ATTEMPT_STATE };
   cookieStore.set({
     name: ATTEMPT_COOKIE,
-    value: serializeAttemptState(newState),
+    value: serializeAttemptState(newPasswordState),
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: COOKIE_MAX_AGE,
+    path: '/',
+  });
+
+  // 3. 重置密保尝试状态
+  const newSecurityState = { ...INITIAL_SECURITY_ATTEMPT_STATE };
+  cookieStore.set({
+    name: SECURITY_ATTEMPT_COOKIE,
+    value: serializeSecurityAttemptState(newSecurityState),
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
