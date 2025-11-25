@@ -135,7 +135,7 @@ export async function authenticate(
 
   if (lockActive) {
     return {
-      error: formatLockRemainingMessage(attemptState.lockedUntil),
+      error: formatLockRemainingMessage(attemptState.lockedUntil!),
       locked: true,
       lockedUntil: attemptState.lockedUntil,
     };
@@ -239,7 +239,7 @@ export async function recoverPassword(
     attemptState.lockedUntil > Date.now();
 
   if (lockActive) {
-    return { error: formatLockRemainingMessage(attemptState.lockedUntil) };
+    return { error: formatLockRemainingMessage(attemptState.lockedUntil!) };
   }
 
   if (attemptState.lockedUntil) {
