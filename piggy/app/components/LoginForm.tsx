@@ -28,7 +28,7 @@ export default function LoginForm() {
     };
 
     checkLock();
-    const interval = setInterval(checkLock, 5000); // Poll every 5 seconds
+    const interval = setInterval(checkLock, 3000); // Poll every 3 seconds
     return () => clearInterval(interval);
   }, []);
 
