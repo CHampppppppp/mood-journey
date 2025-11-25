@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
 
 const GREETINGS = [
   "今天也要开开心心的哦 🌸",
@@ -90,14 +89,6 @@ export default function DailyGreeting() {
             className="relative bg-gradient-to-br from-white via-pink-50/50 to-purple-50/50 rounded-3xl p-8 max-w-sm w-full shadow-2xl border-4 border-white/90 ring-1 ring-pink-200/50"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={handleClose}
-              className="cursor-pointer absolute top-4 right-4 p-2 bg-gradient-to-br from-pink-100 to-purple-100 hover:from-pink-200 hover:to-purple-200 rounded-full text-pink-500 hover:text-pink-600 transition-all"
-              aria-label="关闭"
-            >
-              <X size={18} />
-            </button>
-
             <div className="flex flex-col items-center text-center">
               <motion.div
                 initial={{ scale: 0 }}

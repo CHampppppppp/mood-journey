@@ -105,7 +105,7 @@ function MoodForm({ onSuccess, initialData }: { onSuccess?: () => void, initialD
       {initialData && <input type="hidden" name="id" value={initialData.id} />}
       <div>
         <label className="block text-lg font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-2 text-center">
-          {initialData ? '修改当时的心情' : '今天心情怎么样呀？Piggy~'}
+          {initialData ? '修改当时的心情' : '今天心情怎么样呀？宝宝~'}
         </label>
         <div className="grid grid-cols-3 gap-2">
           {MOODS.map((m) => (
