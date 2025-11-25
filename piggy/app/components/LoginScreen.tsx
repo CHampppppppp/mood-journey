@@ -38,13 +38,16 @@ const CHARACTER_AVATARS = [
     { src: '/zoro.jpg', alt: 'Zoro' },
     { src: '/L.jpg', alt: 'L' },
     { src: '/misa.jpg', alt: 'Misa' },
-    { src: '/L and misa.jpg', alt: 'L and Misa' },
     { src: '/akaza.jpg', alt: 'Akaza' },
     { src: '/akaza2.jpg', alt: 'Akaza' },
     { src: '/Kamado.jpg', alt: 'Kamado' },
-    { src: '/makima.jpg', alt: 'Makima' },
+    { src: '/makima2.jpg', alt: 'Makima' },
+    { src: '/makima3.jpg', alt: 'Makima' },
     { src: '/paiqiushaonian.jpg', alt: '排球少年' },
     { src: '/paiqiushaonian2.jpg', alt: '排球少年' },
+    { src: '/wushan1.webp', alt: '巫山云海' },
+    { src: '/wushan2.avif', alt: '巫山云海' },
+    { src: '/wushan3.webp', alt: '巫山云海' },
 ];
 
 // 生成不重叠的随机位置（考虑元素尺寸，确保不超出视口）
@@ -139,8 +142,8 @@ export default function LoginScreen() {
         const decorCount = Math.floor(Math.random() * 3) + 4;
         const smallDecorPositions = generateRandomPositions(decorCount, 50);
 
-        // 随机选择 4-6 个角色头像（最大尺寸约85px）
-        const avatarCount = Math.floor(Math.random() * 3) + 4;
+        // 使用全部角色头像（最大尺寸约85px）
+        const avatarCount = CHARACTER_AVATARS.length;
         const selectedAvatars = shuffleAndPick(CHARACTER_AVATARS, avatarCount);
         const avatarPositions = generateRandomPositions(avatarCount, 90);
 

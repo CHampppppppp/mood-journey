@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Mood } from '@/lib/actions';
+import type { Mood } from '@/lib/types';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { CatSticker, HeartSticker } from './KawaiiStickers';

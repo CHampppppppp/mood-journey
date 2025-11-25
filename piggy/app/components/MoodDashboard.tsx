@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, memo, useMemo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, List as ListIcon, type LucideIcon, Plus, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -8,7 +8,7 @@ import Image from 'next/image';
 import MoodCalendar from './MoodCalendar';
 import MoodHistory from './MoodHistory';
 import MoodForm from './MoodForm';
-import { Mood, Period } from '@/lib/actions';
+import type { Mood, Period } from '@/lib/types';
 import LogoutButton from './LogoutButton';
 import {
   CatSticker, DogSticker, HeartSticker, PawSticker, SleepyCatSticker,
@@ -45,13 +45,16 @@ const CHARACTER_AVATARS = [
   { src: '/zoro.jpg', alt: 'Zoro' },
   { src: '/L.jpg', alt: 'L' },
   { src: '/misa.jpg', alt: 'Misa' },
-  { src: '/L and misa.jpg', alt: 'L and Misa' },
   { src: '/akaza.jpg', alt: 'Akaza' },
   { src: '/akaza2.jpg', alt: 'Akaza' },
   { src: '/Kamado.jpg', alt: 'Kamado' },
-  { src: '/makima.jpg', alt: 'Makima' },
+  { src: '/makima2.jpg', alt: 'Makima' },
+  { src: '/makima3.jpg', alt: 'Makima' },
   { src: '/paiqiushaonian.jpg', alt: '排球少年' },
   { src: '/paiqiushaonian2.jpg', alt: '排球少年' },
+  { src: '/wushan1.webp', alt: '巫山云海' },
+  { src: '/wushan2.avif', alt: '巫山云海' },
+  { src: '/wushan3.webp', alt: '巫山云海' },
 ];
 
 // 生成不重叠的随机位置（针对 Dashboard 的边缘区域，考虑元素尺寸不超出视口）
@@ -121,6 +124,43 @@ function randomSize(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function createRandomDecorations() {
+  // 随机选择 7-9 个动物（最大尺寸约95px）
+  const animalCount = Math.floor(Math.random() * 3) + 7;
+  const selectedAnimals = shuffleAndPick(ANIMAL_STICKERS, animalCount);
+  const animalPositions = generateRandomPositions(animalCount, 100);
+
+  // 随机选择 3-5 个小装饰（最大尺寸约50px）
+  const decorCount = Math.floor(Math.random() * 3) + 3;
+  const smallDecorPositions = generateRandomPositions(decorCount, 55);
+
+  // 使用全部角色头像（最大尺寸约108px）
+  const avatarCount = CHARACTER_AVATARS.length;
+  const selectedAvatars = shuffleAndPick(CHARACTER_AVATARS, avatarCount);
+  const avatarPositions = generateRandomPositions(avatarCount, 115);
+
+  return {
+    animals: selectedAnimals.map((animal, i) => ({
+      ...animal,
+      size: randomSize(animal.minSize, animal.maxSize),
+      position: animalPositions[i],
+    })),
+    decorations: Array.from({ length: decorCount }, (_, i) => {
+      const decor = SMALL_DECORATIONS[Math.floor(Math.random() * SMALL_DECORATIONS.length)];
+      return {
+        ...decor,
+        size: randomSize(decor.minSize, decor.maxSize),
+        position: smallDecorPositions[i],
+      };
+    }),
+    avatars: selectedAvatars.map((avatar, i) => ({
+      ...avatar,
+      size: randomSize(81, 108),
+      position: avatarPositions[i],
+    })),
+  };
+}
+
 // 动态导入欢迎语组件
 const DailyGreeting = dynamic(() => import('./DailyGreeting'), {
   ssr: false,
@@ -141,8 +181,8 @@ const TabButton = memo(({
   <button
     onClick={onClick}
     className={`cursor-pointer flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-300 font-bold ${isActive
-        ? 'bg-[#ffd6e7] text-black border-3 border-black shadow-[3px_3px_0_#1a1a1a]'
-        : 'bg-white text-gray-500 border-3 border-transparent hover:border-black hover:bg-gray-50'
+      ? 'bg-[#ffd6e7] text-black border-3 border-black shadow-[3px_3px_0_#1a1a1a]'
+      : 'bg-white text-gray-500 border-3 border-transparent hover:border-black hover:bg-gray-50'
       }`}
   >
     <Icon size={18} strokeWidth={2.5} />
@@ -156,43 +196,10 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
   const [view, setView] = useState<'calendar' | 'history'>('calendar');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingMood, setEditingMood] = useState<Mood | null>(null);
+  const [randomDecorations, setRandomDecorations] = useState<ReturnType<typeof createRandomDecorations> | null>(null);
 
-  // 生成随机装饰位置
-  const randomDecorations = useMemo(() => {
-    // 随机选择 7-9 个动物（最大尺寸约95px）
-    const animalCount = Math.floor(Math.random() * 3) + 7;
-    const selectedAnimals = shuffleAndPick(ANIMAL_STICKERS, animalCount);
-    const animalPositions = generateRandomPositions(animalCount, 100);
-
-    // 随机选择 3-5 个小装饰（最大尺寸约50px）
-    const decorCount = Math.floor(Math.random() * 3) + 3;
-    const smallDecorPositions = generateRandomPositions(decorCount, 55);
-
-    // 随机选择 4-6 个角色头像（最大尺寸约108px）
-    const avatarCount = Math.floor(Math.random() * 3) + 4;
-    const selectedAvatars = shuffleAndPick(CHARACTER_AVATARS, avatarCount);
-    const avatarPositions = generateRandomPositions(avatarCount, 115);
-
-    return {
-      animals: selectedAnimals.map((animal, i) => ({
-        ...animal,
-        size: randomSize(animal.minSize, animal.maxSize),
-        position: animalPositions[i],
-      })),
-      decorations: Array.from({ length: decorCount }, (_, i) => {
-        const decor = SMALL_DECORATIONS[Math.floor(Math.random() * SMALL_DECORATIONS.length)];
-        return {
-          ...decor,
-          size: randomSize(decor.minSize, decor.maxSize),
-          position: smallDecorPositions[i],
-        };
-      }),
-      avatars: selectedAvatars.map((avatar, i) => ({
-        ...avatar,
-        size: randomSize(81, 108),
-        position: avatarPositions[i],
-      })),
-    };
+  useEffect(() => {
+    setRandomDecorations(createRandomDecorations());
   }, []);
 
   const handleEditMood = (mood: Mood) => {
@@ -215,51 +222,53 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
       <DailyGreeting />
       <div className="h-screen w-full bg-white pattern-dots sm:flex sm:items-center sm:justify-center overflow-hidden relative">
         {/* 随机背景装饰贴纸 */}
-        <div className="absolute inset-0 pointer-events-none hidden sm:block">
-          {/* 动物贴纸 */}
-          {randomDecorations.animals.map((animal, index) => (
-            <div
-              key={`animal-${index}`}
-              className="absolute animate-float"
-              style={{
-                top: `${animal.position.top}%`,
-                left: `${animal.position.left}%`,
-                animationDelay: `${animal.position.delay}s`,
-              }}
-            >
-              <animal.Component size={animal.size} />
-            </div>
-          ))}
+        {randomDecorations && (
+          <div className="absolute inset-0 pointer-events-none hidden sm:block">
+            {/* 动物贴纸 */}
+            {randomDecorations.animals.map((animal, index) => (
+              <div
+                key={`animal-${index}`}
+                className="absolute animate-float"
+                style={{
+                  top: `${animal.position.top}%`,
+                  left: `${animal.position.left}%`,
+                  animationDelay: `${animal.position.delay}s`,
+                }}
+              >
+                <animal.Component size={animal.size} />
+              </div>
+            ))}
 
-          {/* 小装饰 */}
-          {randomDecorations.decorations.map((decor, index) => (
-            <div
-              key={`decor-${index}`}
-              className="absolute"
-              style={{
-                top: `${decor.position.top}%`,
-                left: `${decor.position.left}%`,
-              }}
-            >
-              <decor.Component size={decor.size} />
-            </div>
-          ))}
+            {/* 小装饰 */}
+            {randomDecorations.decorations.map((decor, index) => (
+              <div
+                key={`decor-${index}`}
+                className="absolute"
+                style={{
+                  top: `${decor.position.top}%`,
+                  left: `${decor.position.left}%`,
+                }}
+              >
+                <decor.Component size={decor.size} />
+              </div>
+            ))}
 
-          {/* 角色头像 */}
-          {randomDecorations.avatars.map((avatar, index) => (
-            <div
-              key={`avatar-${index}`}
-              className="absolute pointer-events-auto animate-float"
-              style={{
-                top: `${avatar.position.top}%`,
-                left: `${avatar.position.left}%`,
-                animationDelay: `${avatar.position.delay}s`,
-              }}
-            >
-              <CharacterAvatar src={avatar.src} alt={avatar.alt} size={avatar.size} />
-            </div>
-          ))}
-        </div>
+            {/* 角色头像 */}
+            {randomDecorations.avatars.map((avatar, index) => (
+              <div
+                key={`avatar-${index}`}
+                className="absolute pointer-events-auto animate-float"
+                style={{
+                  top: `${avatar.position.top}%`,
+                  left: `${avatar.position.left}%`,
+                  animationDelay: `${avatar.position.delay}s`,
+                }}
+              >
+                <CharacterAvatar src={avatar.src} alt={avatar.alt} size={avatar.size} />
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 主要手机框架容器 */}
         <div className="w-full h-full sm:w-[420px] sm:h-[850px] sm:max-h-[95vh] bg-white flex flex-col overflow-hidden relative sm:rounded-[30px] sm:border-4 sm:border-black sm:shadow-[8px_8px_0_#1a1a1a]">

@@ -1,19 +1,21 @@
 'use client';
 
 import { useState, useCallback, memo } from 'react';
-import { saveMood, type Mood } from '@/lib/actions';
+import Image from 'next/image';
+import { saveMood } from '@/lib/actions';
+import type { Mood } from '@/lib/types';
 import { useToast } from './ToastProvider';
 import { Droplet } from 'lucide-react';
 import { HeartSticker, PawSticker } from './KawaiiStickers';
 
 export const MOODS = [
-  { label: '开心', emoji: '😊', value: 'happy' },
-  { label: '幸福', emoji: '🥰', value: 'blissful' },
-  { label: '累', emoji: '😴', value: 'tired' },
-  { label: '烦躁', emoji: '😫', value: 'annoyed' },
-  { label: '生气', emoji: '😠', value: 'angry' },
-  { label: '沮丧', emoji: '😔', value: 'depressed' },
-];
+  { label: '开心', emoji: '😊', value: 'happy', image: '/happy.jpg' },
+  { label: '幸福', emoji: '🥰', value: 'blissful', image: '/happiness.jpg' },
+  { label: '累', emoji: '😴', value: 'tired', image: '/tired.jpg' },
+  { label: '烦躁', emoji: '😫', value: 'annoyed', image: '/annoy.jpg' },
+  { label: '生气', emoji: '😠', value: 'angry', image: '/angry.jpg' },
+  { label: '沮丧', emoji: '😔', value: 'depressed', image: '/sad.jpg' },
+] as const;
 
 // 优化的心情按钮组件 - 漫画风格，更紧凑
 const MoodButton = memo(({
@@ -34,7 +36,15 @@ const MoodButton = memo(({
         : 'bg-white border-gray-200 hover:border-black hover:shadow-[2px_2px_0_#1a1a1a]'
     }`}
   >
-    <span className="text-2xl">{mood.emoji}</span>
+    <div className="relative w-14 h-14 flex items-center justify-center mb-1 overflow-hidden rounded-xl border-2 border-white shadow-[2px_2px_0_#1a1a1a]">
+      <Image
+        src={mood.image}
+        alt={`${mood.label}情绪图片`}
+        fill
+        sizes="56px"
+        className="object-cover"
+      />
+    </div>
     <span className={`text-xs font-bold ${isSelected ? 'text-black' : 'text-gray-500'}`}>
       {mood.label}
     </span>

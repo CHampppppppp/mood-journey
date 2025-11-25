@@ -16,7 +16,7 @@ import {
 } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, X, Edit2 } from 'lucide-react';
-import { Mood, Period } from '@/lib/actions';
+import type { Mood, Period } from '@/lib/types';
 import { MOODS } from './MoodForm';
 import { HeartSticker, PawSticker } from './KawaiiStickers';
 
