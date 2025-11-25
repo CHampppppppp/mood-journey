@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { authenticate, type AuthState } from '@/lib/auth';
+import { authenticate, type AuthState, getAccountLockStatus } from '@/lib/auth';
 import { useToast } from './ToastProvider';
 import { useSafeActionState } from '@/app/hooks/useSafeActionState';
 
@@ -11,6 +11,26 @@ const initialState: AuthState = {};
 export default function LoginForm() {
   const [state, dispatch] = useSafeActionState(authenticate, initialState);
   const { showToast } = useToast();
+  const [dbLocked, setDbLocked] = useState(false);
+  const [lockMessage, setLockMessage] = useState('');
+
+  useEffect(() => {
+    const checkLock = async () => {
+      const status = await getAccountLockStatus();
+      if (status.isLocked && status.lockedUntil) {
+        setDbLocked(true);
+        const remainingMinutes = Math.ceil((status.lockedUntil - Date.now()) / 60000);
+        setLockMessage(`当前账号被保护啦，${remainingMinutes}分钟后再试试~`);
+      } else {
+        setDbLocked(false);
+        setLockMessage('');
+      }
+    };
+
+    checkLock();
+    const interval = setInterval(checkLock, 5000); // Poll every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (state?.error) {
@@ -18,13 +38,18 @@ export default function LoginForm() {
     }
   }, [showToast, state?.error]);
 
-  const locked = Boolean(state?.locked);
+  const locked = Boolean(state?.locked) || dbLocked;
 
   return (
     <form
       action={dispatch}
       className="w-full space-y-4"
     >
+      {locked && lockMessage && (
+        <div className="rounded-2xl bg-pink-50 p-4 text-center text-sm text-pink-600 animate-pulse">
+          {lockMessage}
+        </div>
+      )}
       <div className="space-y-2">
         <label
           htmlFor="password"
@@ -38,7 +63,7 @@ export default function LoginForm() {
           type="password"
           required
           disabled={locked}
-          className="w-full rounded-2xl border border-pink-200 bg-white/80 px-4 py-3 text-base text-pink-900 placeholder-pink-300 focus:border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-200"
+          className="w-full rounded-2xl border border-pink-200 bg-white/80 px-4 py-3 text-base text-pink-900 placeholder-pink-300 focus:border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-50 disabled:cursor-not-allowed"
           placeholder="输入我们的小秘密"
           autoComplete="current-password"
         />

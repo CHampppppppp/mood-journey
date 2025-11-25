@@ -1,5 +1,6 @@
 'use server';
 
+import pool from '@/lib/db';
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -35,6 +36,59 @@ const INITIAL_ATTEMPT_STATE: AttemptState = {
   messageIndex: 0,
   lockEscalation: 0,
 };
+
+async function setAccountLock(minutes: number, reason: string) {
+  try {
+    await pool.query(
+      `INSERT INTO account_locks (locked_at, duration_minutes, reason)
+       VALUES (NOW(), $1, $2)`,
+      [minutes, reason]
+    );
+  } catch (error) {
+    console.error('Failed to record account lock:', error);
+  }
+}
+
+async function clearAccountLock() {
+  try {
+    await pool.query(
+      `INSERT INTO account_locks (locked_at, duration_minutes, reason)
+       VALUES (NOW(), 0, 'Unlocked via security questions')`
+    );
+  } catch (error) {
+    console.error('Failed to clear account lock:', error);
+  }
+}
+
+export async function getAccountLockStatus() {
+  try {
+    const { rows } = await pool.query(
+      `SELECT locked_at, duration_minutes FROM account_locks 
+       ORDER BY locked_at DESC LIMIT 1`
+    );
+
+    if (rows.length === 0) {
+      return { isLocked: false };
+    }
+
+    const lock = rows[0];
+    const lockedUntil = new Date(lock.locked_at).getTime() + lock.duration_minutes * 60 * 1000;
+    const now = Date.now();
+    
+    if (now < lockedUntil) {
+      return {
+        isLocked: true,
+        lockedUntil,
+        lockedAt: new Date(lock.locked_at).getTime(),
+        duration: lock.duration_minutes
+      };
+    }
+  } catch (error) {
+    console.error('Failed to check lock status:', error);
+  }
+  
+  return { isLocked: false };
+}
 
 function clampMessageIndex(index: number) {
   return Math.min(Math.max(index, 0), FAILURE_MESSAGES.length - 1);
@@ -129,6 +183,17 @@ export async function authenticate(
 
   const cookieStore = await cookies();
   const attemptState = readAttemptState(cookieStore.get(ATTEMPT_COOKIE)?.value);
+  
+  // Check DB lock first
+  const dbLock = await getAccountLockStatus();
+  if (dbLock.isLocked && dbLock.lockedUntil) {
+    return {
+      error: formatLockRemainingMessage(dbLock.lockedUntil),
+      locked: true,
+      lockedUntil: dbLock.lockedUntil,
+    };
+  }
+
   const lockActive =
     typeof attemptState.lockedUntil === 'number' &&
     attemptState.lockedUntil > Date.now();
@@ -177,6 +242,8 @@ export async function authenticate(
 
     if (attemptState.count > MAX_ATTEMPTS_BEFORE_LOCK) {
       const minutes = applyLock(attemptState);
+      await setAccountLock(minutes, 'Password retry limit exceeded');
+
       cookieStore.set({
         name: ATTEMPT_COOKIE,
         value: serializeAttemptState(attemptState),
@@ -234,25 +301,14 @@ export async function recoverPassword(
 ): Promise<RecoveryState> {
   const cookieStore = await cookies();
   const attemptState = readAttemptState(cookieStore.get(ATTEMPT_COOKIE)?.value);
-  const lockActive =
-    typeof attemptState.lockedUntil === 'number' &&
-    attemptState.lockedUntil > Date.now();
+  
+  // We allow password recovery even if account is locked.
+  // However, we still check if they already used their one chance at security questions during this lock.
 
-  if (lockActive) {
-    return { error: formatLockRemainingMessage(attemptState.lockedUntil!) };
-  }
-
-  if (attemptState.lockedUntil) {
+  if (attemptState.lockedUntil && attemptState.lockedUntil <= Date.now()) {
+    // Lock expired, clear timestamp
     delete attemptState.lockedUntil;
-    cookieStore.set({
-      name: ATTEMPT_COOKIE,
-      value: serializeAttemptState(attemptState),
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: COOKIE_MAX_AGE,
-      path: '/',
-    });
+    // We don't update cookie here yet, will do it at end or if security check fails
   }
 
   if (attemptState.securityAttempted) {
@@ -274,7 +330,9 @@ export async function recoverPassword(
   if (!allCorrect) {
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    applyLock(attemptState);
+    const minutes = applyLock(attemptState);
+    await setAccountLock(minutes, 'Security question failed');
+    
     cookieStore.set({
       name: ATTEMPT_COOKIE,
       value: serializeAttemptState(attemptState),
@@ -288,9 +346,15 @@ export async function recoverPassword(
     return { error: '密保回答错啦，账号已经进入保护，稍后再试~' };
   }
 
+  // Success - Clear locks
+  await clearAccountLock();
+
+  // Reset all attempts on successful recovery
+  const newState = { ...INITIAL_ATTEMPT_STATE };
+
   cookieStore.set({
     name: ATTEMPT_COOKIE,
-    value: serializeAttemptState(attemptState),
+    value: serializeAttemptState(newState),
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
