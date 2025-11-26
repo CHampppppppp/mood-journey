@@ -80,10 +80,6 @@ const DayCell = memo(({
           }`}
         />
       )}
-      {/* 强烈情绪标记 */}
-      {mood && mood.intensity >= 2 && (
-        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#ffd6e7] rounded-full border-2 border-black" />
-      )}
     </div>
   );
 });

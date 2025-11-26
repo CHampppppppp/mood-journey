@@ -10,11 +10,15 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
+    "chromadb": "^3.1.6",
     "date-fns": "^4.1.0",
     "framer-motion": "^11.0.0",
+    "langchain": "^1.1.1",
     "lucide-react": "^0.554.0",
+    "mysql2": "^3.15.3",
     "next": "16.0.3",
     "nodemailer": "^6.10.1",
+    "openai": "^6.9.1",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },

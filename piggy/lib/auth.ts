@@ -59,7 +59,7 @@ async function setAccountLock(minutes: number, reason: string, lockType: LockTyp
   try {
     await pool.query(
       `INSERT INTO account_locks (locked_at, duration_minutes, reason, lock_type)
-       VALUES (NOW(), $1, $2, $3)`,
+       VALUES (NOW(), ?, ?, ?)`,
       [minutes, reason, lockType]
     );
   } catch (error) {
@@ -108,7 +108,7 @@ export async function getAccountLockStatus(lockType: LockType = 'password') {
   try {
     const { rows } = await pool.query(
       `SELECT locked_at, duration_minutes FROM account_locks 
-       WHERE lock_type = $1
+       WHERE lock_type = ?
        ORDER BY locked_at DESC LIMIT 1`,
       [lockType]
     );

@@ -21,20 +21,20 @@ export async function saveMood(formData: FormData) {
   if (id) {
     // 更新现有记录
     await pool.query(
-      'UPDATE moods SET mood = $1, intensity = $2, note = $3 WHERE id = $4',
+      'UPDATE moods SET mood = ?, intensity = ?, note = ? WHERE id = ?',
       [mood, intensity, note, id]
     );
   } else {
     // 插入新记录
     await pool.query(
-      'INSERT INTO moods (mood, intensity, note) VALUES ($1, $2, $3)',
+      'INSERT INTO moods (mood, intensity, note) VALUES (?, ?, ?)',
       [mood, intensity, note]
     );
 
     // 如果是经期开始，保存经期记录
     if (isPeriodStart) {
       await pool.query(
-        'INSERT INTO periods (start_date) VALUES ($1)',
+        'INSERT INTO periods (start_date) VALUES (?)',
         [new Date()]
       );
     }
