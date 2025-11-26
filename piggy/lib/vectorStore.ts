@@ -103,9 +103,7 @@ export async function addMemories(records: MemoryRecord[]): Promise<void> {
   if (!vectors.length) return;
 
   // 先简单用单一 namespace，后续可以根据用户拆分
-  await index.upsert(vectors, {
-    namespace: 'piggy',
-  });
+  await index.namespace('piggy').upsert(vectors);
 }
 
 export type RetrievedMemory = {
@@ -127,11 +125,10 @@ export async function searchMemories(
   if (!queryEmbedding || queryEmbedding.length === 0) return [];
 
   try {
-    const result = await index.query({
+    const result = await index.namespace('piggy').query({
       vector: queryEmbedding,
       topK: k,
       includeMetadata: true,
-      namespace: 'piggy',
     });
 
     const matches = result.matches || [];
