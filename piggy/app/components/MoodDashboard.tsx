@@ -62,9 +62,9 @@ const CHARACTER_AVATARS = [
   { src: '/kunomi1.jpg', alt: 'Kunomi' },
   { src: '/penguin.jpg', alt: 'Penguin' },
   { src: '/zhangyu.jpg', alt: '章鱼' },
-  { src: '/fortnitecat.jpg', alt: 'Fortnite Cat' },
+  { src: '/fortnitecat1.jpg', alt: 'Fortnite Cat' },
   { src: '/uno2.jpg', alt: 'Uno2' },
-  { src: '/uno1.jpg', alt: 'Uno1'}
+  { src: '/uno1.jpg', alt: 'Uno1' }
 ];
 
 const PERIOD_DURATION_DAYS = 7;
@@ -148,9 +148,13 @@ function buildPeriodStatus(periods: Period[]): PeriodStatus {
 
 // 生成不重叠的随机位置（针对 Dashboard 的边缘区域，考虑元素尺寸不超出视口）
 // maxElementSize: 元素最大尺寸（像素），用于计算安全边距
-function generateRandomPositions(count: number, maxElementSize: number = 100) {
+function generateRandomPositions(
+  count: number,
+  maxElementSize: number = 100,
+  minDistanceOverride?: number
+) {
   const positions: { top: number; left: number; delay: number }[] = [];
-  const minDistance = 14; // 最小间距百分比
+  const baseMinDistance = minDistanceOverride ?? 14; // 最小间距百分比
   // 根据元素尺寸计算安全边距（假设视口约1000px，转换为百分比）
   const safeMargin = Math.ceil(maxElementSize / 10); // 约等于元素尺寸的百分比
 
@@ -158,6 +162,7 @@ function generateRandomPositions(count: number, maxElementSize: number = 100) {
     let attempts = 0;
     let validPosition = false;
     let top = 0, left = 0;
+    let minDistance = baseMinDistance;
 
     while (!validPosition && attempts < 50) {
       // 将屏幕分为边缘区域，避开中心手机框架区域，同时确保不超出视口
@@ -190,13 +195,23 @@ function generateRandomPositions(count: number, maxElementSize: number = 100) {
       });
 
       attempts++;
+      if (attempts % 10 === 0 && minDistance > 6) {
+        minDistance -= 2;
+      }
     }
 
-    positions.push({
-      top,
-      left,
-      delay: Math.random() * 2,
-    });
+    if (!validPosition) {
+      // 退化为基于网格的分布，避免完全重叠
+      const gridSize = Math.ceil(Math.sqrt(count));
+      const row = Math.floor(i / gridSize);
+      const col = i % gridSize;
+      const horizontalSpan = 75 - safeMargin * 2;
+      const verticalSpan = 70 - safeMargin * 2;
+      top = 10 + (row / Math.max(1, gridSize - 1)) * verticalSpan;
+      left = 12 + (col / Math.max(1, gridSize - 1)) * horizontalSpan;
+    }
+
+    positions.push({ top, left, delay: Math.random() * 2 });
   }
 
   return positions;
@@ -220,6 +235,13 @@ function getResponsiveAvatarCount(width: number) {
   return 24;
 }
 
+function getAvatarMinDistance(count: number) {
+  if (count <= 6) return 18;
+  if (count <= 12) return 14;
+  if (count <= 20) return 12;
+  return 10;
+}
+
 function createRandomDecorations(avatarCount?: number) {
   // 随机选择 7-9 个动物（最大尺寸约95px）
   const animalCount = Math.floor(Math.random() * 3) + 7;
@@ -234,7 +256,11 @@ function createRandomDecorations(avatarCount?: number) {
   const maximumAvatars = avatarCount ?? CHARACTER_AVATARS.length;
   const finalAvatarCount = Math.min(maximumAvatars, CHARACTER_AVATARS.length);
   const selectedAvatars = shuffleAndPick(CHARACTER_AVATARS, finalAvatarCount);
-  const avatarPositions = generateRandomPositions(finalAvatarCount, 115);
+  const avatarPositions = generateRandomPositions(
+    finalAvatarCount,
+    115,
+    getAvatarMinDistance(finalAvatarCount)
+  );
 
   return {
     animals: selectedAnimals.map((animal, i) => ({
