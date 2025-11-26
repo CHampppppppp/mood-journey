@@ -34,7 +34,7 @@ const MoodCard = memo(({ mood }: { mood: Mood }) => (
 
       {/* 强度指示器 */}
       <div className="flex gap-1.5 mb-2">
-        {Array.from({ length: mood.intensity + 1 }).map((_, i) => (
+        {Array.from({ length: mood.intensity }).map((_, i) => (
           <div
             key={i}
             className="w-2 h-2 rounded-full bg-[#ffd6e7] border-2 border-black"
