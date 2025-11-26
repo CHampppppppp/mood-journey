@@ -38,12 +38,16 @@ export default function ForgotPasswordModal() {
     }, [showToast, state?.error, state?.success]);
 
     const handleOptionSelect = (questionId: string, optionId: string) => {
+        if (isLocked) return; // 锁定状态下禁止选择
         setAnswers((prev) => ({ ...prev, [questionId]: optionId }));
     };
 
     const currentQuestion = securityQuestions[currentStep];
     const isLastStep = currentStep === securityQuestions.length - 1;
     const canProceed = currentQuestion && answers[currentQuestion.id];
+
+    // 判断是否处于锁定状态（error 中包含“锁定”关键词即可视为锁定）
+    const isLocked = !!(state?.error && state.error.includes('锁定'));
 
     return (
         <>
@@ -57,20 +61,20 @@ export default function ForgotPasswordModal() {
 
             {open && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 bg-black/30"
+                    className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8"
                     onClick={() => setOpen(false)}
                 >
                     <div
-                        className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-3xl bg-white p-6 border-4 border-black shadow-[8px_8px_0_#1a1a1a] space-y-6 scrollbar-hide relative"
+                        className="w-[90vw] max-w-lg max-h-[85vh] overflow-y-auto rounded-3xl bg-white p-6 border-4 border-black shadow-[8px_8px_0_#1a1a1a] space-y-6 scrollbar-hide relative"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* 关闭按钮 */}
-                        <button
+                        {/* <button
                             onClick={() => setOpen(false)}
                             className="absolute top-4 right-4 p-2 rounded-full border-3 border-black bg-white hover:bg-[#ffd6e7] transition-colors cursor-pointer"
                         >
                             <X size={18} strokeWidth={3} />
-                        </button>
+                        </button> */}
 
                         {/* 装饰贴纸 */}
                         <div className="absolute -top-5 -left-5">
@@ -114,7 +118,7 @@ export default function ForgotPasswordModal() {
                             {!state?.success && currentQuestion && (
                                 <fieldset
                                     key={currentQuestion.id}
-                                    className="space-y-3 rounded-2xl border-3 border-black p-4 bg-white shadow-[4px_4px_0_#1a1a1a]"
+                                    className="space-y-3 rounded-2xl border-3 border-black p-4 bg-white shadow-[4px_4px_0_#1a1a1a] min-w-[280px]"
                                 >
                                     <legend className="text-sm font-bold text-black px-2 bg-[#ffd6e7] rounded-full border-2 border-black">
                                         {currentQuestion.question}
@@ -126,19 +130,23 @@ export default function ForgotPasswordModal() {
                                         {currentQuestion.options.map((option) => (
                                             <label
                                                 key={option.id}
-                                                className={`flex items-center gap-3 rounded-xl border-3 px-4 py-3 text-sm cursor-pointer transition-all font-medium ${
-                                                    answers[currentQuestion.id] === option.id
+                                                className={`flex items-center gap-3 rounded-xl border-3 px-4 py-3 text-sm transition-all font-medium w-full ${
+                                                    isLocked
+                                                        ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                                                        : answers[currentQuestion.id] === option.id
                                                         ? 'border-black bg-[#ffd6e7] text-black shadow-[2px_2px_0_#1a1a1a]'
-                                                        : 'border-gray-200 bg-white text-gray-600 hover:border-black'
+                                                        : 'border-gray-200 bg-white text-gray-600 hover:border-black cursor-pointer'
                                                 }`}
                                                 onClick={() => handleOptionSelect(currentQuestion.id, option.id)}
                                             >
                                                 <div className={`w-5 h-5 rounded-full border-3 flex items-center justify-center ${
-                                                    answers[currentQuestion.id] === option.id
+                                                    isLocked
+                                                        ? 'border-gray-300 bg-gray-100'
+                                                        : answers[currentQuestion.id] === option.id
                                                         ? 'border-black bg-black'
                                                         : 'border-gray-300'
                                                 }`}>
-                                                    {answers[currentQuestion.id] === option.id && (
+                                                    {!isLocked && answers[currentQuestion.id] === option.id && (
                                                         <div className="w-2 h-2 rounded-full bg-white" />
                                                     )}
                                                 </div>
@@ -149,8 +157,16 @@ export default function ForgotPasswordModal() {
                                 </fieldset>
                             )}
 
+                            {/* 锁定提示 */}
+                            {isLocked && (
+                                <div className="rounded-2xl border-3 border-red-300 bg-red-50 px-4 py-3 text-center min-w-[280px]">
+                                    <p className="text-sm text-red-700 font-bold">🔒 密保功能已被锁定</p>
+                                    <p className="text-xs text-red-600">请等待锁定时间结束后再试</p>
+                                </div>
+                            )}
+
                             {state?.success && state.password && (
-                                <div className="space-y-3 rounded-2xl border-3 border-black bg-[#ffd6e7] px-4 py-5 text-center shadow-[4px_4px_0_#1a1a1a]">
+                                <div className="space-y-3 rounded-2xl border-3 border-black bg-[#ffd6e7] px-4 py-5 text-center shadow-[4px_4px_0_#1a1a1a] min-w-[280px]">
                                     <div className="flex justify-center mb-2">
                                         <HeartSticker size={40} />
                                     </div>
@@ -162,15 +178,15 @@ export default function ForgotPasswordModal() {
                                 </div>
                             )}
 
-                            <div className="flex flex-col gap-3 sm:flex-row">
+                            <div className="flex flex-col gap-3 sm:flex-row w-full">
                                 {!state?.success ? (
                                     isLastStep ? (
-                                        <RecoverSubmitButton disabled={!canProceed} />
+                                        <RecoverSubmitButton disabled={!canProceed || isLocked} />
                                     ) : (
                                         <button
                                             type="button"
                                             onClick={() => setCurrentStep((prev) => prev + 1)}
-                                            disabled={!canProceed}
+                                            disabled={!canProceed || isLocked}
                                             className="w-full rounded-2xl bg-[#ffd6e7] px-4 py-3 text-black font-bold border-3 border-black shadow-[4px_4px_0_#1a1a1a] transition hover:shadow-[6px_6px_0_#1a1a1a] hover:-translate-x-0.5 hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-[4px_4px_0_#1a1a1a] disabled:hover:translate-x-0 disabled:hover:translate-y-0"
                                         >
                                             下一题 →

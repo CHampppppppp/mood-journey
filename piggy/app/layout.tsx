@@ -18,7 +18,7 @@ const comicNeue = Comic_Neue({
 });
 
 export const metadata: Metadata = {
-  title: "Mood Diary 🐱 ｜ Kawaii Edition",
+  title: "Kawaii Mood Diary 🐱",
   description: "超可爱的心情日记本 ♡",
   icons: {
     icon: "/heart.svg",
