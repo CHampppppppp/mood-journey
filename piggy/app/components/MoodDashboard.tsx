@@ -217,6 +217,84 @@ function generateRandomPositions(
   return positions;
 }
 
+function generateSideDistributedPositions(count: number, maxElementSize: number = 100) {
+  const positions: { top: number; left: number; delay: number }[] = [];
+  const safeMargin = Math.ceil(maxElementSize / 14);
+  const verticalPadding = Math.max(2, safeMargin);
+  const verticalMin = verticalPadding;
+  const verticalMax = 100 - verticalPadding;
+  const innerPadding = Math.max(6, safeMargin);
+  const leftBox = {
+    top: verticalMin,
+    bottom: verticalMax,
+    left: 4,
+    right: 40 - innerPadding,
+  };
+  const rightBox = {
+    top: verticalMin,
+    bottom: verticalMax,
+    left: 60 + innerPadding,
+    right: 96,
+  };
+  const leftCount = Math.ceil(count / 2);
+  const rightCount = count - leftCount;
+  const minDistance = Math.max(10, 0.12 * (verticalMax - verticalMin));
+
+  const sampleInBox = (
+    sideCount: number,
+    box: { top: number; bottom: number; left: number; right: number }
+  ) => {
+    const sidePositions: { top: number; left: number; delay: number }[] = [];
+    if (sideCount <= 0) {
+      return sidePositions;
+    }
+
+    const width = box.right - box.left;
+    const height = box.bottom - box.top;
+    const fallbackCols = Math.max(1, Math.round(Math.sqrt(sideCount)));
+    const fallbackRows = Math.max(1, Math.ceil(sideCount / fallbackCols));
+
+    for (let i = 0; i < sideCount; i++) {
+      let placed = false;
+      for (let attempt = 0; attempt < 60 && !placed; attempt++) {
+        const top = Math.random() * height + box.top;
+        const left = Math.random() * width + box.left;
+        const fits = sidePositions.every(pos => {
+          const distance = Math.hypot(pos.left - left, pos.top - top);
+          return distance >= minDistance;
+        });
+        if (fits) {
+          sidePositions.push({ top, left, delay: Math.random() * 2 });
+          placed = true;
+        }
+      }
+
+      if (!placed) {
+        const row = Math.floor(i / fallbackCols);
+        const col = i % fallbackCols;
+        const cellWidth = width / fallbackCols;
+        const cellHeight = height / fallbackRows;
+        const top =
+          box.top + row * cellHeight + cellHeight / 2 + (Math.random() - 0.5) * cellHeight * 0.4;
+        const left =
+          box.left + col * cellWidth + cellWidth / 2 + (Math.random() - 0.5) * cellWidth * 0.4;
+        sidePositions.push({
+          top: Math.min(box.bottom, Math.max(box.top, top)),
+          left: Math.min(box.right, Math.max(box.left, left)),
+          delay: Math.random() * 2,
+        });
+      }
+    }
+
+    positions.push(...sidePositions);
+  };
+
+  sampleInBox(leftCount, leftBox);
+  sampleInBox(rightCount, rightBox);
+
+  return positions;
+}
+
 // 随机选择数组中的元素
 function shuffleAndPick<T>(array: T[], count: number): T[] {
   const shuffled = [...array].sort(() => Math.random() - 0.5);
@@ -256,11 +334,7 @@ function createRandomDecorations(avatarCount?: number) {
   const maximumAvatars = avatarCount ?? CHARACTER_AVATARS.length;
   const finalAvatarCount = Math.min(maximumAvatars, CHARACTER_AVATARS.length);
   const selectedAvatars = shuffleAndPick(CHARACTER_AVATARS, finalAvatarCount);
-  const avatarPositions = generateRandomPositions(
-    finalAvatarCount,
-    115,
-    getAvatarMinDistance(finalAvatarCount)
-  );
+  const avatarPositions = generateSideDistributedPositions(finalAvatarCount, 115);
 
   return {
     animals: selectedAnimals.map((animal, i) => ({
