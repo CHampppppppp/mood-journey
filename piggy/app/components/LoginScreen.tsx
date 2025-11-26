@@ -1,13 +1,13 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import LoginForm from './LoginForm';
 import ForgotPasswordModal from './ForgotPasswordModal';
 import { useImagePreloader } from '@/app/hooks/useImagePreloader';
 import {
     CatSticker, DogSticker, HeartSticker, StarSticker, PawSticker,
     SnakeSticker, CapybaraSticker, PandaSticker, BunnySticker, BirdSticker,
-    BearSticker, DuckSticker, FrogSticker, CharacterAvatar
+    BearSticker, DuckSticker, FrogSticker
 } from './KawaiiStickers';
 import Image from 'next/image';
 
@@ -51,12 +51,19 @@ const CHARACTER_AVATARS = [
     { src: '/wushan3.webp', alt: '巫山云海' },
 ];
 
-// 需要预加载的图片列表（包括角色头像和Makima图片）
-const PRELOAD_IMAGES = [
-    ...CHARACTER_AVATARS.map(avatar => avatar.src),
-    '/makima2.jpg', // DailyGreeting中的图片
-    '/makima3.jpg', // MoodDashboard中的图片
-];
+// 移动端只预加载两张Makima图片，桌面端加载所有图片
+const getPreloadImages = (isMobile: boolean) => {
+    return isMobile 
+        ? [
+            '/makima2.jpg', // DailyGreeting中的图片
+            '/makima3.jpg', // MoodDashboard中的图片
+        ]
+        : [
+            ...CHARACTER_AVATARS.map(avatar => avatar.src),
+            '/makima2.jpg', // DailyGreeting中的图片
+            '/makima3.jpg', // MoodDashboard中的图片
+        ];
+};
 
 // 移除图片预加载工具函数，改用Hook
 
@@ -141,18 +148,45 @@ export default function LoginScreen() {
         avatars: Array<{ src: string; alt: string; size: number; position: { top: number; left: number; delay: number } }>;
     } | null>(null);
     
-    // 使用图片预加载Hook
-    const { loaded: imagesPreloaded } = useImagePreloader(PRELOAD_IMAGES);
+    // 检测是否为移动端
+    const [isMobile, setIsMobile] = useState(false);
+    
+    useEffect(() => {
+        // 客户端检测是否为移动设备
+        const checkIsMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        
+        checkIsMobile();
+        
+        // 监听窗口大小变化
+        const handleResize = () => {
+            checkIsMobile();
+        };
+        
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+    
+    // 预加载列表由客户端检测后再设置，避免在SSR首次渲染就加载桌面端大列表
+    const [preloadList, setPreloadList] = useState<string[]>([]);
+
+    useEffect(() => {
+        setPreloadList(getPreloadImages(isMobile));
+    }, [isMobile]);
+
+    // 使用图片预加载Hook，根据设备类型加载不同图片
+    const { loaded: imagesPreloaded } = useImagePreloader(preloadList);
 
     useEffect(() => {
         // 只在客户端生成随机装饰
-        // 随机选择 6-8 个动物（最大尺寸约80px）
-        const animalCount = Math.floor(Math.random() * 3) + 6;
+        // 移动端减少装饰元素数量以提高性能
+        const animalCount = isMobile ? Math.floor(Math.random() * 2) + 3 : Math.floor(Math.random() * 3) + 6;
         const selectedAnimals = shuffleAndPick(ANIMAL_STICKERS, animalCount);
         const animalPositions = generateRandomPositions(animalCount, 85);
 
-        // 随机选择 4-6 个小装饰（最大尺寸约45px）
-        const decorCount = Math.floor(Math.random() * 3) + 4;
+        // 移动端减少小装饰数量
+        const decorCount = isMobile ? Math.floor(Math.random() * 2) + 2 : Math.floor(Math.random() * 3) + 4;
         const smallDecorPositions = generateRandomPositions(decorCount, 50);
 
         setRandomDecorations({
@@ -172,7 +206,7 @@ export default function LoginScreen() {
             // 角色头像不再在登录界面显示，改为预加载
             avatars: [],
         });
-    }, []);
+    }, [isMobile]);
 
     // 监听图片预加载状态（调试用，可移除）
     useEffect(() => {
