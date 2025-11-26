@@ -4,6 +4,7 @@ import pool from './db';
 import { revalidatePath } from 'next/cache';
 
 import type { Mood, Period } from './types';
+import { sendSuperMoodAlert } from './email';
 export type { Mood, Period } from './types';
 
 // 保存心情记录
@@ -37,6 +38,12 @@ export async function saveMood(formData: FormData) {
         [new Date()]
       );
     }
+  }
+
+  if (intensity === 3) {
+    sendSuperMoodAlert({ mood, note, isUpdate: Boolean(id) }).catch((err) => {
+      console.error('Failed to send mood alert email', err);
+    });
   }
 
   revalidatePath('/');

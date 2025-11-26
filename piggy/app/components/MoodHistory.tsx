@@ -20,7 +20,7 @@ const MoodCard = memo(({ mood }: { mood: Mood }) => (
     <div className="text-4xl flex items-center justify-center bg-[#ffd6e7] w-14 h-14 rounded-2xl border-3 border-black shrink-0 kawaii-hover">
       {MOOD_EMOJIS[mood.mood] || '😐'}
     </div>
-    
+
     {/* 内容区 */}
     <div className="flex-1 min-w-0">
       <div className="flex justify-between items-center mb-1">
@@ -31,17 +31,17 @@ const MoodCard = memo(({ mood }: { mood: Mood }) => (
           {format(new Date(mood.created_at), 'HH:mm')}
         </span>
       </div>
-      
+
       {/* 强度指示器 */}
       <div className="flex gap-1.5 mb-2">
         {Array.from({ length: mood.intensity + 1 }).map((_, i) => (
-          <div 
-            key={i} 
-            className="w-2 h-2 rounded-full bg-[#ffd6e7] border-2 border-black" 
+          <div
+            key={i}
+            className="w-2 h-2 rounded-full bg-[#ffd6e7] border-2 border-black"
           />
         ))}
       </div>
-      
+
       {/* 笔记 */}
       {mood.note && (
         <p className="text-gray-600 text-sm truncate font-medium">{mood.note}</p>
@@ -63,7 +63,7 @@ function MoodHistory({ moods }: { moods: Mood[] }) {
         </h2>
         <HeartSticker size={24} />
       </div>
-      
+
       <div className="space-y-3">
         {moods.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
