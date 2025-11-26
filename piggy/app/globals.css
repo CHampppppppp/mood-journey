@@ -5,6 +5,40 @@
  * 配色方案：黑(#1a1a1a)、白(#ffffff)、淡粉(#ffd6e7)
  */
 
+@font-face {
+  font-family: "NunitoLocal";
+  src: url("/fonts/Nunito/static/Nunito-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NunitoLocal";
+  src: url("/fonts/Nunito/static/Nunito-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "ComicNeueLocal";
+  src: url("/fonts/Comic_Neue,Nunito/Comic_Neue/ComicNeue-Regular.ttf")
+    format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "ComicNeueLocal";
+  src: url("/fonts/Comic_Neue,Nunito/Comic_Neue/ComicNeue-Bold.ttf")
+    format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #1a1a1a;
@@ -19,14 +53,14 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-nunito);
-  --font-display: var(--font-comic-neue);
+  --font-sans: "NunitoLocal", system-ui, -apple-system, sans-serif;
+  --font-display: "ComicNeueLocal", system-ui, -apple-system, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Nunito', -apple-system, sans-serif;
+  font-family: "NunitoLocal", system-ui, -apple-system, sans-serif;
 }
 
 /* 动漫风格描边文字 - 黑白描边效果 */
