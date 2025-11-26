@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ToastProvider from "./components/ToastProvider";
+import ChatWidget from "./components/ChatWidget";
 
 export const metadata: Metadata = {
   title: "Kawaii Mood Diary 🐱",
@@ -18,7 +19,10 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className="antialiased">
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          {children}
+          <ChatWidget />
+        </ToastProvider>
       </body>
     </html>
   );

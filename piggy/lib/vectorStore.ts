@@ -1,89 +1,150 @@
-import { ChromaClient, IncludeEnum } from "chromadb";
-import OpenAI from "openai";
+import { ChromaClient, type Collection } from 'chromadb';
+import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// 对于简单个人项目，可以直接用默认的 ChromaClient 配置（内嵌/本地存储）。
-// 如果你本机起了 Chroma Server，可以把这里改成 new ChromaClient({ path: "http://localhost:8000" })
-const chromaClient = new ChromaClient();
-
-const COLLECTION_NAME = "user-memories";
-
-async function getOrCreateCollection() {
-  return chromaClient.getOrCreateCollection({
-    name: COLLECTION_NAME,
-    metadata: { description: "Personal memory base for Piggy" },
-  });
-}
-
-export type MemoryItem = {
-  id: string;
-  text: string;
-  meta?: Record<string, unknown>;
+export type MemoryMetadata = {
+  type: 'mood' | 'file' | 'note';
+  author: 'piggy' | 'champ';
+  datetime: string;
+  sourceId?: string;
+  sourceFilename?: string;
 };
 
+export type MemoryRecord = {
+  id: string;
+  text: string;
+  metadata: MemoryMetadata;
+};
+
+const MEMORIES_COLLECTION = 'piggy-memories';
+
+// 如果你本地起了 Chroma Server（推荐），设置 CHROMA_URL，例如：http://localhost:8000
+const chromaClient = new ChromaClient({
+  path: process.env.CHROMA_URL || 'http://localhost:8000',
+});
+
+let memoriesCollectionPromise: Promise<Collection | null> | null = null;
+
+async function getMemoriesCollection(): Promise<Collection | null> {
+  if (!memoriesCollectionPromise) {
+    memoriesCollectionPromise = (async () => {
+      try {
+        const existing = await chromaClient.getOrCreateCollection({
+          name: MEMORIES_COLLECTION,
+          metadata: { description: 'Piggy & Champ shared memories' },
+          // 我们自己提供 embedding，不使用 Chroma 的默认 embeddingFunction，避免额外依赖
+          embeddingFunction: {
+            generate: async () => {
+              throw new Error(
+                '[vectorStore] This embeddingFunction should not be called because embeddings are provided explicitly.'
+              );
+            },
+          },
+        });
+        return existing;
+      } catch (err) {
+        console.error('[vectorStore] Failed to getOrCreateCollection', err);
+        return null;
+      }
+    })();
+  }
+  return memoriesCollectionPromise;
+}
+
+// OpenAI 向量模型，用于生成向量写入 Chroma
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+const openaiEmbedClient = OPENAI_API_KEY
+  ? new OpenAI({ apiKey: OPENAI_API_KEY })
+  : null;
+
 async function embedTexts(texts: string[]): Promise<number[][]> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error(
-      "[vectorStore] Missing OPENAI_API_KEY. Please set it in your env."
+  if (!texts.length) return [];
+
+  if (!openaiEmbedClient) {
+    console.warn(
+      '[vectorStore] OPENAI_API_KEY is not set. Embedding will be skipped and RAG will be disabled.'
     );
+    return texts.map(() => []);
   }
 
-  const res = await openai.embeddings.create({
-    model: "text-embedding-3-small",
+  const res = await openaiEmbedClient.embeddings.create({
+    model: 'text-embedding-3-small',
     input: texts,
   });
 
-  return res.data.map((d) => d.embedding);
+  return res.data.map((item) => item.embedding as number[]);
 }
 
-export async function addMemories(
-  userId: string,
-  items: MemoryItem[]
-): Promise<void> {
-  const collection = await getOrCreateCollection();
-  const texts = items.map((i) => i.text);
-  const embeddings = await embedTexts(texts);
+export async function addMemories(records: MemoryRecord[]): Promise<void> {
+  if (!records.length) return;
+
+  const collection = await getMemoriesCollection();
+  if (!collection) return;
+
+  const ids = records.map((r) => r.id);
+  const documents = records.map((r) => r.text);
+  const metadatas = records.map((r) => r.metadata);
+
+  const embeddings = await embedTexts(documents);
 
   await collection.add({
-    ids: items.map((i) => `${userId}-${i.id}`),
-    documents: texts,
-    metadatas: items.map((i) => ({
-      userId,
-      ...(i.meta ?? {}),
-    })),
+    ids,
     embeddings,
+    metadatas,
+    documents,
   });
 }
 
-export type SearchResult = {
-  documents: string[];
-  metadatas: Record<string, unknown>[];
-  distances: number[];
+export type RetrievedMemory = {
+  text: string;
+  metadata: MemoryMetadata;
+  distance?: number;
 };
 
 export async function searchMemories(
-  userId: string,
   query: string,
-  k = 5
-): Promise<SearchResult> {
-  const collection = await getOrCreateCollection();
+  k: number = 5
+): Promise<RetrievedMemory[]> {
+  if (!query.trim()) return [];
+
+  const collection = await getMemoriesCollection();
+  if (!collection) {
+    // 如果向量库没连上，就当作当前没有记忆，返回空列表，这样聊天至少还能正常进行
+    return [];
+  }
+
   const [queryEmbedding] = await embedTexts([query]);
 
-  const res = await collection.query({
-    queryEmbeddings: [queryEmbedding],
-    nResults: k,
-    where: { userId },
-    include: [IncludeEnum.Documents, IncludeEnum.Metadatas, IncludeEnum.Distances],
-  });
+  const result = await collection
+    .query({
+      nResults: k,
+      queryEmbeddings: [queryEmbedding],
+      include: ['documents', 'metadatas', 'distances'],
+    })
+    .catch((err) => {
+      console.error('[vectorStore] Failed to query memories', err);
+      return {
+        documents: [[]],
+        metadatas: [[]],
+        distances: [[]],
+      };
+    });
 
-  return {
-    documents: res.documents?.[0] ?? [],
-    metadatas: (res.metadatas?.[0] as Record<string, unknown>[]) ?? [],
-    distances: res.distances?.[0] ?? [],
-  };
+  const documents = result.documents?.[0] || [];
+  const metadatas = result.metadatas?.[0] || [];
+  const distances = result.distances?.[0] || [];
+
+  const items: RetrievedMemory[] = [];
+  for (let i = 0; i < documents.length; i += 1) {
+    const text = documents[i] as string | null;
+    const metadata = metadatas[i] as MemoryMetadata | undefined;
+    if (!text || !metadata) continue;
+    items.push({
+      text,
+      metadata,
+      distance: typeof distances[i] === 'number' ? (distances[i] as number) : undefined,
+    });
+  }
+
+  return items;
 }
-
-

@@ -510,12 +510,12 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
           {/* Header - 漫画风格 */}
           <header className="relative flex-none pt-8 pb-3 px-6 text-center bg-[#ffd6e7] border-b-4 border-black z-10">
             {/* 右上角退出按钮 */}
-            <div className="absolute right-4 top-4">
+            <div className="absolute right-4 top-8">
               <LogoutButton />
             </div>
 
             {/* 左上角Makima贴画 */}
-            <div className="absolute left-4 top-3 w-14 h-14 rounded-full overflow-hidden border-3 border-black sticker-hover">
+            <div className="absolute left-4 top-6 w-14 h-14 rounded-full overflow-hidden border-3 border-black sticker-hover">
               <Image
                 src="/makima3.jpg"
                 alt="Makima"
