@@ -85,6 +85,11 @@ function MoodForm({ onSuccess, initialData }: { onSuccess?: () => void, initialD
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { showToast } = useToast();
 
+  // 使用浏览器本地时间生成今天的日期 key，避免受服务端 / 数据库时区影响
+  const todayKey = new Date()
+    .toLocaleDateString('zh-CN')
+    .replace(/\//g, '-'); // 例如 2025-11-27
+
   const handleSubmit = useCallback(async (formData: FormData) => {
     if (!selectedMood) {
       showToast('先选一个心情嘛～ 💕', 'error');
@@ -115,6 +120,7 @@ function MoodForm({ onSuccess, initialData }: { onSuccess?: () => void, initialD
   return (
     <form action={handleSubmit} className="space-y-3 w-full mx-auto">
       {initialData && <input type="hidden" name="id" value={initialData.id} />}
+      {!initialData && <input type="hidden" name="date_key" value={todayKey} />}
 
       <div>
         <label className="flex items-center justify-center gap-2 text-sm font-bold text-black mb-2">

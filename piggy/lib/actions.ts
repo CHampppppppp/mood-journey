@@ -16,6 +16,7 @@ export async function saveMood(formData: FormData) {
   const intensity = parseInt(formData.get('intensity') as string);
   const note = formData.get('note') as string;
   const isPeriodStart = formData.get('is_period_start') === 'on';
+  const dateKey = (formData.get('date_key') as string) || null;
 
   if (!mood) throw new Error('Mood is required');
 
@@ -25,14 +26,14 @@ export async function saveMood(formData: FormData) {
   if (id) {
     // 更新现有记录
     await pool.query(
-      'UPDATE moods SET mood = ?, intensity = ?, note = ? WHERE id = ?',
-      [mood, intensity, note, id]
+      'UPDATE moods SET mood = ?, intensity = ?, note = ?, date_key = COALESCE(?, date_key) WHERE id = ?',
+      [mood, intensity, note, dateKey, id]
     );
   } else {
     // 插入新记录
     await pool.query(
-      'INSERT INTO moods (mood, intensity, note) VALUES (?, ?, ?)',
-      [mood, intensity, note]
+      'INSERT INTO moods (mood, intensity, note, date_key) VALUES (?, ?, ?, ?)',
+      [mood, intensity, note, dateKey]
     );
 
     // 如果是经期开始，保存经期记录

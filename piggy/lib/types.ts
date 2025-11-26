@@ -3,6 +3,7 @@ export type Mood = {
   mood: string;
   intensity: number;
   note: string;
+  date_key?: string | null;
   created_at: Date;
 };
 

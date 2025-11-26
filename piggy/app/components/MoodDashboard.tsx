@@ -282,9 +282,9 @@ function generateSideDistributedPositions(count: number, maxElementSize: number 
         sidePositions.push({
           top: Math.min(box.bottom, Math.max(box.top, top)),
           left: Math.min(box.right, Math.max(box.left, left)),
-      delay: Math.random() * 2,
-    });
-  }
+          delay: Math.random() * 2,
+        });
+      }
     }
 
     positions.push(...sidePositions);
@@ -396,17 +396,29 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
   const [editingMood, setEditingMood] = useState<Mood | null>(null);
   const [randomDecorations, setRandomDecorations] = useState<ReturnType<typeof createRandomDecorations> | null>(null);
   const periodStatus = useMemo(() => buildPeriodStatus(periods), [periods]);
-  const latestMood = useMemo(() => moods.length ? moods.reduce((latest, mood) => (
-    new Date(mood.created_at) > new Date(latest.created_at) ? mood : latest
-  ), moods[0]) : null, [moods]);
+  const latestMood = useMemo(
+    () =>
+      moods.length
+        ? moods.reduce(
+          (latest, mood) =>
+            new Date(mood.created_at) > new Date(latest.created_at) ? mood : latest,
+          moods[0]
+        )
+        : null,
+    [moods]
+  );
+
+  // 使用浏览器本地时间判断“今天是否已经记录过”，避免受服务端 / 数据库时区影响
   const hasTodayMood = useMemo(() => {
-    if (!latestMood) return false;
-    const createdAt = new Date(latestMood.created_at);
-    const today = new Date();
-    return createdAt.getFullYear() === today.getFullYear() &&
-      createdAt.getMonth() === today.getMonth() &&
-      createdAt.getDate() === today.getDate();
-  }, [latestMood]);
+    if (!moods.length) return false;
+    const todayKey = new Date().toLocaleDateString('zh-CN').replace(/\//g, '-');
+    return moods.some((m) => {
+      const moodKey =
+        (m as any).date_key ||
+        new Date(m.created_at).toLocaleDateString('zh-CN').replace(/\//g, '-');
+      return moodKey === todayKey;
+    });
+  }, [moods]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
