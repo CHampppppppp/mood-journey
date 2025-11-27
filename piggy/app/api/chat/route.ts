@@ -74,7 +74,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const reversedUsers = [...messages].reverse().filter((m) => m.role === 'user');
+    const reversedUsers = [...messages]
+      .reverse()
+      .filter((m) => m.role === 'user');
     const lastUserMessage = reversedUsers[0];
     const previousUserMessage = reversedUsers[1];
 
@@ -82,6 +84,7 @@ export async function POST(req: NextRequest) {
 
     // 如果用户明确让 Champ 记住某件事，把这段内容写入向量记忆
     if (query.trim()) {
+      console.log('[api/chat] incoming query:', query);
       const extraction = extractMemoryFromMessage(query);
       if (extraction) {
         let memoryText = extraction.text.trim();
@@ -110,6 +113,12 @@ export async function POST(req: NextRequest) {
           },
         };
 
+        console.log('[api/chat] storing memory', {
+          memoryId,
+          cueOnly: extraction.cueOnly,
+          payload: memory.text,
+        });
+
         addMemories([memory]).catch((err) => {
           console.error('[api/chat] Failed to store chat memory', err);
         });
@@ -120,6 +129,7 @@ export async function POST(req: NextRequest) {
     let context = '';
     if (query.trim()) {
       const queryType = classifyQuery(query);
+      console.log('[api/chat] query type:', queryType);
       const currentInfo = getCurrentInfo();
       
       // 总是提供当前时间信息，让AI知道现在的时间
@@ -134,6 +144,7 @@ export async function POST(req: NextRequest) {
       } else if (queryType === 'memory') {
         // 纯历史记忆查询，检索相关记忆
         const memories = await searchMemories(query, 6);
+        console.log('[api/chat] memory-only search hits:', memories.length);
         if (memories.length > 0) {
           const formatted = memories
             .map((m) => {
@@ -151,6 +162,7 @@ export async function POST(req: NextRequest) {
       } else {
         // 混合查询，同时提供实时信息和历史记忆
         const memories = await searchMemories(query, 4); // 减少记忆数量，为实时信息留空间
+        console.log('[api/chat] hybrid search hits:', memories.length);
         if (memories.length > 0) {
           const formatted = memories
             .map((m) => {
