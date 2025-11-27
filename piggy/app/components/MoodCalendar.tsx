@@ -106,17 +106,25 @@ function MoodCalendar({ moods, periodStatus, onEditMood }: MoodCalendarProps) {
   const getMoodForDay = useMemo(() => {
     const moodMap = new Map<string, Mood>();
     moods.forEach(m => {
-      // 优先使用前端传入并保存的 date_key（基于用户本地时区计算的“哪一天”）
+      // 优先使用前端传入并保存的 date_key（基于用户本地时区计算的"哪一天"）
       const dateKey =
         (m as any).date_key ||
-        new Date(m.created_at).toLocaleDateString('zh-CN').replace(/\//g, '-');
+        new Date(m.created_at).toLocaleDateString('zh-CN', { 
+          year: 'numeric', 
+          month: '2-digit', 
+          day: '2-digit' 
+        }).replace(/\//g, '-');
       if (!moodMap.has(dateKey)) {
         moodMap.set(dateKey, m);
       }
     });
 
     return (day: Date) => {
-      const dateKey = day.toLocaleDateString('zh-CN').replace(/\//g, '-');
+      const dateKey = day.toLocaleDateString('zh-CN', { 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit' 
+      }).replace(/\//g, '-');
       return moodMap.get(dateKey) || null;
     };
   }, [moods]);

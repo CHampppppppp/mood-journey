@@ -87,7 +87,11 @@ function MoodForm({ onSuccess, initialData }: { onSuccess?: () => void, initialD
 
   // 使用浏览器本地时间生成今天的日期 key，避免受服务端 / 数据库时区影响
   const todayKey = new Date()
-    .toLocaleDateString('zh-CN')
+    .toLocaleDateString('zh-CN', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    })
     .replace(/\//g, '-'); // 例如 2025-11-27
 
   const handleSubmit = useCallback(async (formData: FormData) => {

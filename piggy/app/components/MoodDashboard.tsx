@@ -408,14 +408,22 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
     [moods]
   );
 
-  // 使用浏览器本地时间判断“今天是否已经记录过”，避免受服务端 / 数据库时区影响
+  // 使用浏览器本地时间判断"今天是否已经记录过"，避免受服务端 / 数据库时区影响
   const hasTodayMood = useMemo(() => {
     if (!moods.length) return false;
-    const todayKey = new Date().toLocaleDateString('zh-CN').replace(/\//g, '-');
+    const todayKey = new Date().toLocaleDateString('zh-CN', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    }).replace(/\//g, '-');
     return moods.some((m) => {
       const moodKey =
         (m as any).date_key ||
-        new Date(m.created_at).toLocaleDateString('zh-CN').replace(/\//g, '-');
+        new Date(m.created_at).toLocaleDateString('zh-CN', { 
+          year: 'numeric', 
+          month: '2-digit', 
+          day: '2-digit' 
+        }).replace(/\//g, '-');
       return moodKey === todayKey;
     });
   }, [moods]);
@@ -447,6 +455,23 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
         window.clearTimeout(resizeTimeout);
       }
     };
+  }, []);
+
+  // 隐式记录登录日志（静默发送，不显示任何提示）
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // 延迟一小段时间再发送，避免影响页面加载性能
+    const timer = setTimeout(() => {
+      fetch('/api/log-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(() => {
+        // 静默失败，不影响用户体验
+      });
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const handleEditMood = (mood: Mood) => {
