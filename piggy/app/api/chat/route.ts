@@ -14,6 +14,11 @@ type ApiChatMessage = {
   content: string;
 };
 
+type ExtractedMemory = {
+  text: string;
+  cueOnly: boolean;
+};
+
 const MEMORY_REQUEST_KEYWORDS = [
   '记住',
   '记得',
@@ -27,7 +32,7 @@ const MEMORY_REQUEST_KEYWORDS = [
   '记在心里',
 ];
 
-function extractMemoryFromMessage(message: string): string | null {
+function extractMemoryFromMessage(message: string): ExtractedMemory | null {
   const normalized = message?.trim();
   if (!normalized) return null;
 
@@ -45,10 +50,16 @@ function extractMemoryFromMessage(message: string): string | null {
   cleaned = cleaned.replace(/^[，。.!?\s]+|[，。.!?\s]+$/g, '').trim();
 
   if (cleaned.length < 6) {
-    return normalized;
+    return {
+      text: normalized,
+      cueOnly: true,
+    };
   }
 
-  return cleaned;
+  return {
+    text: cleaned,
+    cueOnly: false,
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -63,16 +74,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const lastUserMessage = [...messages]
-      .reverse()
-      .find((m) => m.role === 'user');
+    const reversedUsers = [...messages].reverse().filter((m) => m.role === 'user');
+    const lastUserMessage = reversedUsers[0];
+    const previousUserMessage = reversedUsers[1];
 
     const query = lastUserMessage?.content || '';
 
     // 如果用户明确让 Champ 记住某件事，把这段内容写入向量记忆
     if (query.trim()) {
-      const memoryText = extractMemoryFromMessage(query);
-      if (memoryText) {
+      const extraction = extractMemoryFromMessage(query);
+      if (extraction) {
+        let memoryText = extraction.text.trim();
+
+        // 如果用户只是单独说“帮我记着”，就使用上一条真正的内容
+        if (extraction.cueOnly && previousUserMessage?.content?.trim()) {
+          memoryText = previousUserMessage.content.trim();
+        }
+
+        if (!memoryText) {
+          memoryText = extraction.text.trim();
+        }
+
         const now = new Date();
         const memoryId = `chat-${now.getTime()}-${Math.random()
           .toString(36)
