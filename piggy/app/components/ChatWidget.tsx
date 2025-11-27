@@ -151,7 +151,7 @@ function ChatWidget() {
                   className="object-cover"
                 />
               </div>
-              <div className="text-xs font-bold">聊聊天捏</div>
+              <div className="text-xs font-bold">Champ</div>
             </div>
             <button
               type="button"
