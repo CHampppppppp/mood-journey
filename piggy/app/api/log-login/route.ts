@@ -25,26 +25,30 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString()
     });
 
-    // 记录登录日志（异步，不阻塞响应）
-    pool
-      .query(
+    // 同步等待数据库写入，确保能捕获错误
+    try {
+      await pool.query(
         'INSERT INTO login_logs (logged_in_at, user_agent, ip_address) VALUES (NOW(), ?, ?)',
         [userAgent, ipAddress]
-      )
-      .then(() => {
-        console.log('[LoginLog API] 登录日志保存成功');
-      })
-      .catch((err) => {
-        // 静默失败，不影响用户体验
-        console.error('[LoginLog API] 登录日志保存失败:', err);
-      });
+      );
+      console.log('[LoginLog API] 登录日志保存成功');
+      return NextResponse.json({ success: true });
+    } catch (dbError) {
+      console.error('[LoginLog API] 数据库写入失败:', dbError);
+      // 返回错误信息以便调试
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Database write failed',
+        details: dbError instanceof Error ? dbError.message : String(dbError)
+      }, { status: 500 });
+    }
 
-    // 立即返回成功，不等待数据库写入
-    return NextResponse.json({ success: true });
   } catch (error) {
-    // 静默失败，不影响用户体验
     console.error('[LoginLog API] 处理登录日志时发生错误:', error);
-    return NextResponse.json({ success: false }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }
-
