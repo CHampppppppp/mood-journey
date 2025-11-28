@@ -320,6 +320,7 @@ function ChatWidget() {
       const decoder = new TextDecoder('utf-8');
       let fullContent = ''; // 用于检测刷新标记
       let shouldRefresh = false; // 是否需要刷新页面
+      let messageContent = ''; // 实际的消息内容（排除日志）
 
       /**
        * 逐块读取流式内容，并实时更新最后一条 assistant 消息
@@ -338,39 +339,43 @@ function ChatWidget() {
 
         fullContent += chunkText;
 
+        // 提取日志信息并输出到浏览器控制台
+        const logRegex = /\[LOG\](.*?)\[END_LOG\]/g;
+        let match;
+        let processedContent = fullContent;
+
+        while ((match = logRegex.exec(fullContent)) !== null) {
+          const logMessage = match[1];
+          // 输出到浏览器控制台
+          console.log(`[api/chat:${requestId}] ${logMessage}`);
+          // 从内容中移除日志标记
+          processedContent = processedContent.replace(match[0], '');
+        }
+
         // 检查是否需要刷新页面（检测特殊标记）
-        if (fullContent.includes('[REFRESH_PAGE]')) {
+        if (processedContent.includes('[REFRESH_PAGE]')) {
           shouldRefresh = true;
           // 移除标记，不显示在消息中
-          const cleanContent = fullContent.replace('[REFRESH_PAGE]', '').trim();
-          setMessages((prev) => {
-            const next = [...prev];
-            const lastIndex = next.length - 1;
-            if (lastIndex >= 0 && next[lastIndex].role === 'assistant') {
-              next[lastIndex] = {
-                ...next[lastIndex],
-                content: cleanContent,
-              };
-            }
-            saveMessages(next, true);
-            return next;
-          });
-        } else {
-          // 更新最后一条助手消息，追加新接收到的文本
-          setMessages((prev) => {
-            const next = [...prev];
-            const lastIndex = next.length - 1;
-            if (lastIndex >= 0 && next[lastIndex].role === 'assistant') {
-              next[lastIndex] = {
-                ...next[lastIndex],
-                content: next[lastIndex].content + chunkText,
-              };
-            }
-            // 节流保存，减少保存频率
-            saveMessages(next, false);
-            return next;
-          });
+          processedContent = processedContent.replace('[REFRESH_PAGE]', '').trim();
         }
+
+        // 更新消息内容（排除日志标记）
+        messageContent = processedContent;
+
+        // 更新最后一条助手消息
+        setMessages((prev) => {
+          const next = [...prev];
+          const lastIndex = next.length - 1;
+          if (lastIndex >= 0 && next[lastIndex].role === 'assistant') {
+            next[lastIndex] = {
+              ...next[lastIndex],
+              content: messageContent,
+            };
+          }
+          // 节流保存，减少保存频率
+          saveMessages(next, false);
+          return next;
+        });
       }
 
       // 流结束时立即保存一次，确保数据不丢失

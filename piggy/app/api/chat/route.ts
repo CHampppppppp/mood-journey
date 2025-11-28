@@ -64,9 +64,24 @@ type ApiChatMessage = {
   content: string;
 };
 
+// 日志收集器，用于将后端日志传递到前端
+const logCollector: string[] = [];
+
+function addLog(message: string, requestId: string) {
+  const logMessage = `[api/chat:${requestId}] ${message}`;
+  console.log(logMessage);
+  logCollector.push(logMessage);
+  // 只保留最近100条日志，避免内存泄漏
+  if (logCollector.length > 100) {
+    logCollector.shift();
+  }
+}
+
 export async function POST(req: NextRequest) {
   const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const startTime = Date.now();
+  // 清空当前请求的日志收集器
+  const currentLogs: string[] = [];
   
   try {
     const body = await req.json();
@@ -85,7 +100,9 @@ export async function POST(req: NextRequest) {
     const query = lastUserMessage?.content || '';
     
     // 1. 用户发送的消息
-    console.log(`[api/chat:${requestId}] 用户消息: "${query}"`);
+    const userLog = `用户消息: "${query}"`;
+    console.log(`[api/chat:${requestId}] ${userLog}`);
+    currentLogs.push(userLog);
 
     // 1. 构建上下文 (Context)
     let context = '';
@@ -96,7 +113,9 @@ export async function POST(req: NextRequest) {
       
       const currentInfo = getCurrentInfo();
       // 4. 当前时间
-      console.log(`[api/chat:${requestId}] 当前时间: ${currentInfo.currentTime}`);
+      const timeLog = `当前时间: ${currentInfo.currentTime}`;
+      console.log(`[api/chat:${requestId}] ${timeLog}`);
+      currentLogs.push(timeLog);
       
       let realtimeContext = `当前时间信息：
 - 现在是：${currentInfo.currentTime}
@@ -112,10 +131,14 @@ export async function POST(req: NextRequest) {
         
         if (memories.length > 0) {
           // 7. 检索到的记忆摘要
-          console.log(`[api/chat:${requestId}] 检索到的记忆摘要:`);
+          const memoryLog = `检索到的记忆摘要: ${memories.length} 条`;
+          console.log(`[api/chat:${requestId}] ${memoryLog}`);
+          currentLogs.push(memoryLog);
           memories.forEach((m, i) => {
             const preview = m.text.substring(0, 100) + (m.text.length > 100 ? '...' : '');
-            console.log(`[api/chat:${requestId}]   [${i + 1}] ${m.metadata.type} (${m.metadata.datetime}): ${preview}`);
+            const memoryDetail = `  [${i + 1}] ${m.metadata.type} (${m.metadata.datetime}): ${preview}`;
+            console.log(`[api/chat:${requestId}] ${memoryDetail}`);
+            currentLogs.push(memoryDetail);
           });
           
           const formatted = memories
@@ -175,7 +198,9 @@ export async function POST(req: NextRequest) {
 
         // 5. 调用了哪些工具
         const toolNames = toolCalls.map((t: any) => t.function.name);
-        console.log(`[api/chat:${requestId}] 调用工具: ${toolNames.join(', ')}`);
+        const toolLog = `调用工具: ${toolNames.join(', ')}`;
+        console.log(`[api/chat:${requestId}] ${toolLog}`);
+        currentLogs.push(toolLog);
 
         // 将 assistant 的 tool_calls 消息追加到历史
         llmMessages.push(response);
@@ -193,7 +218,9 @@ export async function POST(req: NextRequest) {
           }
 
           // 6. 提供给工具的参数
-          console.log(`[api/chat:${requestId}] 工具参数 [${fnName}]:`, JSON.stringify(args));
+          const paramLog = `工具参数 [${fnName}]: ${JSON.stringify(args)}`;
+          console.log(`[api/chat:${requestId}] ${paramLog}`);
+          currentLogs.push(paramLog);
 
           let result = { success: true, message: 'Tool executed successfully.' };
 
@@ -268,20 +295,16 @@ export async function POST(req: NextRequest) {
     // 这样前端代码不需要修改
     if (body?.stream) {
       const encoder = new TextEncoder();
-      const logs: string[] = []; // 收集日志信息
-      
-      // 收集关键日志信息
-      logs.push(`[api/chat:${requestId}] 用户消息: "${query}"`);
-      if (needsRefresh) {
-        logs.push(`[api/chat:${requestId}] 数据库已更新，需要刷新页面`);
-      }
       
       const stream = new ReadableStream({
         start(controller) {
-          // 先发送日志信息（前端会解析但不显示）
-          logs.forEach(log => {
+          // 先发送日志信息（前端会解析并输出到浏览器控制台，但不显示在消息中）
+          currentLogs.forEach(log => {
             controller.enqueue(encoder.encode(`[LOG]${log}[END_LOG]`));
           });
+          if (needsRefresh) {
+            controller.enqueue(encoder.encode(`[LOG]数据库已更新，需要刷新页面[END_LOG]`));
+          }
           
           // 将完整回复一次性作为一个 chunk 发送
           // 虽然不是真正的流式（逐字），但兼容前端的 reader 逻辑
