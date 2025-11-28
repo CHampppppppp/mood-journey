@@ -65,8 +65,7 @@ export default function ForgotPasswordModal() {
                     onClick={() => setOpen(false)}
                 >
                     <div
-                        className="w-[90vw] max-w-lg max-h-[85vh] overflow-y-auto rounded-3xl bg-white p-6 border-4 border-black shadow-[8px_8px_0_#1a1a1a] space-y-6 scrollbar-hide relative"
-                        style={{ scrollbarGutter: 'stable both-edges' }}
+                        className="w-[90vw] max-w-lg max-h-[85vh] overflow-hidden rounded-3xl bg-white p-6 border-4 border-black shadow-[8px_8px_0_#1a1a1a] space-y-6 relative"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* 关闭按钮 */}
