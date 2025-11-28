@@ -253,10 +253,6 @@ function ChatWidget() {
       content,
     };
 
-    console.log(`[ChatWidget:${requestId}] ===== 发送消息 =====`);
-    console.log(`[ChatWidget:${requestId}] 用户消息: "${content}"`);
-    console.log(`[ChatWidget:${requestId}] 当前消息历史: ${messages.length} 条`);
-
     // 立即显示用户消息和空的助手消息
     // 空的助手消息用于后续流式更新
     const assistantMessage: UiMessage = {
@@ -277,19 +273,12 @@ function ChatWidget() {
         content: m.content,
       }));
 
-      console.log(`[ChatWidget:${requestId}] 准备发送到 API: ${payloadMessages.length} 条消息`);
-      console.log(`[ChatWidget:${requestId}] 消息详情:`, payloadMessages.map(m => `${m.role}(${m.content.length}字)`).join(' -> '));
-
       // 发送请求，启用流式传输
-      const fetchStartTime = Date.now();
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: payloadMessages, stream: true }),
       });
-      const fetchDuration = Date.now() - fetchStartTime;
-
-      console.log(`[ChatWidget:${requestId}] API 响应状态: ${res.status} ${res.statusText} (耗时: ${fetchDuration}ms)`);
 
       // 处理错误响应
       if (!res.ok) {
@@ -322,14 +311,11 @@ function ChatWidget() {
       // 获取流式响应的 reader
       const reader = res.body?.getReader();
       if (!reader) {
-        console.warn(`[ChatWidget:${requestId}] ✗ 无法获取响应流`);
+        console.error(`[ChatWidget:${requestId}] ✗ 无法获取响应流`);
         return;
       }
 
-      console.log(`[ChatWidget:${requestId}] 开始接收流式响应`);
       const decoder = new TextDecoder('utf-8');
-      let totalChunks = 0;
-      let totalLength = 0;
 
       /**
        * 逐块读取流式内容，并实时更新最后一条 assistant 消息
@@ -340,18 +326,11 @@ function ChatWidget() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          console.log(`[ChatWidget:${requestId}] 流式响应接收完成 (共 ${totalChunks} 个块, ${totalLength} 字符)`);
           break; // 流结束
         }
 
         const chunkText = decoder.decode(value, { stream: true });
         if (!chunkText) continue; // 跳过空块
-
-        totalChunks++;
-        totalLength += chunkText.length;
-        if (totalChunks === 1) {
-          console.log(`[ChatWidget:${requestId}] 收到第一个数据块: "${chunkText.substring(0, 50)}${chunkText.length > 50 ? '...' : ''}"`);
-        }
 
         // 更新最后一条助手消息，追加新接收到的文本
         setMessages((prev) => {
@@ -369,22 +348,13 @@ function ChatWidget() {
         });
       }
 
-      const totalDuration = Date.now() - startTime;
-      console.log(`[ChatWidget:${requestId}] ===== 消息处理完成 =====`);
-      console.log(`[ChatWidget:${requestId}] 总耗时: ${totalDuration}ms`);
-      console.log(`[ChatWidget:${requestId}] 最终回复长度: ${totalLength} 字符`);
-
       // 流结束时立即保存一次，确保数据不丢失
       setMessages((prev) => {
         saveMessages(prev, true);
         return prev;
       });
     } catch (err) {
-      const totalDuration = Date.now() - startTime;
-      console.error(`[ChatWidget:${requestId}] ===== 请求异常 =====`);
-      console.error(`[ChatWidget:${requestId}] 错误信息:`, err);
-      console.error(`[ChatWidget:${requestId}] 错误堆栈:`, err instanceof Error ? err.stack : 'N/A');
-      console.error(`[ChatWidget:${requestId}] 失败前耗时: ${totalDuration}ms`);
+      console.error(`[ChatWidget:${requestId}] 请求异常:`, err instanceof Error ? err.message : String(err));
 
       // 网络错误处理
       setMessages((prev) => {
