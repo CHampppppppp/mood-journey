@@ -135,8 +135,9 @@ export async function POST(req: NextRequest) {
           console.log(`[api/chat:${requestId}] ${memoryLog}`);
           currentLogs.push(memoryLog);
           memories.forEach((m, i) => {
-            const preview = m.text.substring(0, 100) + (m.text.length > 100 ? '...' : '');
-            const memoryDetail = `  [${i + 1}] ${m.metadata.type} (${m.metadata.datetime}): ${preview}`;
+            // 将换行符替换为空格，避免日志格式混乱
+            const textPreview = m.text.replace(/\n/g, ' ').substring(0, 100) + (m.text.length > 100 ? '...' : '');
+            const memoryDetail = `  [${i + 1}] ${m.metadata.type} (${m.metadata.datetime}): ${textPreview}`;
             console.log(`[api/chat:${requestId}] ${memoryDetail}`);
             currentLogs.push(memoryDetail);
           });

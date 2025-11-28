@@ -33,7 +33,7 @@ export const TOOLS: ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'track_period',
-      description: '记录用户生理期（大姨妈）开始。当用户提到大姨妈来了、肚子痛等生理期相关话题时调用。',
+      description: '记录用户生理期（大姨妈）开始。当用户提到大姨妈来了、肚子痛、月经、经期等生理期相关话题时调用。',
       parameters: {
         type: 'object',
         properties: {
@@ -50,7 +50,7 @@ export const TOOLS: ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'save_memory',
-      description: '保存重要的信息或用户明确要求记住的事情。比如未来的计划、重要的日期、或者用户的喜好等。',
+      description: '保存重要的信息或用户明确要求记住的事情。比如未来的计划、重要的日期、或者用户的喜好等。琐碎的小事不用记住，防止向量数据库繁冗。但是有用的小细节，能让她感受到被重视被关心的细节要记住。',
       parameters: {
         type: 'object',
         properties: {
