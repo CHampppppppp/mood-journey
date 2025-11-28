@@ -97,17 +97,36 @@ function buildMessages({ messages, context }: ChatOptions): ChatMessage[] {
 
 export async function callDeepseekChat(options: ChatOptions) {
   const finalMessages = buildMessages(options);
+  const hasTools = Boolean(options.tools && options.tools.length > 0);
+  const systemMessage = finalMessages.find(m => m.role === 'system');
+  const systemPromptLength = systemMessage?.content?.length || 0;
+  const userMessagesCount = finalMessages.filter(m => m.role === 'user').length;
 
+  console.log('[llm] 调用 DeepSeek Chat API');
+  console.log(`[llm] 模型: deepseek-chat`);
+  console.log(`[llm] 消息总数: ${finalMessages.length} (系统: 1, 用户: ${userMessagesCount}, 助手: ${finalMessages.length - 1 - userMessagesCount})`);
+  console.log(`[llm] 系统提示词长度: ${systemPromptLength} 字符`);
+  console.log(`[llm] 工具支持: ${hasTools ? `是 (${options.tools?.length} 个工具)` : '否'}`);
+
+  const startTime = Date.now();
   const completion = await deepseekClient.chat.completions.create({
     model: 'deepseek-chat',
     messages: finalMessages as any,
     tools: options.tools,
   });
+  const duration = Date.now() - startTime;
 
   const message = completion.choices[0]?.message;
+  const usage = completion.usage;
+  
+  console.log(`[llm] API 调用完成 (耗时: ${duration}ms)`);
+  if (usage) {
+    console.log(`[llm] Token 使用: prompt=${usage.prompt_tokens}, completion=${usage.completion_tokens}, total=${usage.total_tokens}`);
+  }
 
   // 如果有工具调用，返回完整的 message 对象
   if (message.tool_calls && message.tool_calls.length > 0) {
+    console.log(`[llm] 返回工具调用: ${message.tool_calls.length} 个`);
     // 转换为我们的 ChatMessage 格式
     return {
       role: message.role,
@@ -117,6 +136,7 @@ export async function callDeepseekChat(options: ChatOptions) {
   }
 
   const reply = message?.content || '';
+  console.log(`[llm] 返回文本回复: ${reply.length} 字符`);
   return reply;
 }
 
@@ -252,22 +272,28 @@ const CLASSIFIER_FEW_SHOTS: ChatMessage[] = [
  */
 function classifyByKeywords(query: string): QueryType {
   const normalized = query.toLowerCase();
-  const hasRealtime = REALTIME_KEYWORDS.some((keyword) =>
+  const matchedRealtime = REALTIME_KEYWORDS.filter((keyword) =>
     normalized.includes(keyword)
   );
-  const hasMemory = MEMORY_KEYWORDS.some((keyword) =>
+  const matchedMemory = MEMORY_KEYWORDS.filter((keyword) =>
     normalized.includes(keyword)
   );
+  const hasRealtime = matchedRealtime.length > 0;
+  const hasMemory = matchedMemory.length > 0;
 
   if (hasRealtime && hasMemory) {
+    console.log(`[llm/classifier] 关键词匹配: mixed (实时: [${matchedRealtime.join(', ')}], 记忆: [${matchedMemory.join(', ')}])`);
     return 'mixed';
   }
   if (hasRealtime) {
+    console.log(`[llm/classifier] 关键词匹配: realtime ([${matchedRealtime.join(', ')}])`);
     return 'realtime';
   }
   if (hasMemory) {
+    console.log(`[llm/classifier] 关键词匹配: memory ([${matchedMemory.join(', ')}])`);
     return 'memory';
   }
+  console.log(`[llm/classifier] 关键词匹配: mixed (默认，未匹配到关键词)`);
   return 'mixed'; // 默认返回 mixed，保守策略
 }
 
@@ -287,10 +313,13 @@ function classifyByKeywords(query: string): QueryType {
  */
 async function classifyWithLLM(query: string): Promise<QueryType | null> {
   if (!SMART_CLASSIFIER_ENABLED) {
+    console.log('[llm/classifier] 智能分类器未启用，使用关键词分类');
     return null;
   }
 
   try {
+    console.log(`[llm/classifier] 使用智能分类器 (模型: ${SMART_CLASSIFIER_MODEL})`);
+    const startTime = Date.now();
     const completion = await deepseekClient.chat.completions.create({
       model: SMART_CLASSIFIER_MODEL,
       max_tokens: 4, // 只需要返回一个词，限制 token 数量
@@ -308,15 +337,23 @@ async function classifyWithLLM(query: string): Promise<QueryType | null> {
       ] as any,
     });
 
+    const duration = Date.now() - startTime;
     const answer =
       completion.choices[0]?.message?.content?.toLowerCase().trim() || '';
+    console.log(`[llm/classifier] 分类器返回: "${answer}" (耗时: ${duration}ms)`);
+    
     // 检查返回内容是否包含有效的分类标签
     const found = QUERY_TYPES.find((label) => answer.includes(label));
     if (found) {
+      console.log(`[llm/classifier] ✓ 分类成功: ${found}`);
       return found;
+    } else {
+      console.warn(`[llm/classifier] ✗ 分类失败: 返回内容 "${answer}" 不包含有效标签，回退到关键词分类`);
     }
   } catch (error) {
-    console.error('[llm] smart classifier failed, fallback to keywords', error);
+    const duration = Date.now() - startTime;
+    console.error(`[llm/classifier] ✗ 智能分类器异常 (耗时: ${duration}ms):`, error);
+    console.error('[llm/classifier] 回退到关键词分类');
   }
 
   return null; // 分类失败，返回 null，使用关键词分类作为后备

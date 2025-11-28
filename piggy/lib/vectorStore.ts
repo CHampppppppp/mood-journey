@@ -170,29 +170,49 @@ export type RetrievedMemory = {
  * - 如果 Pinecone 查询失败，返回空数组（不影响聊天功能）
  */
 export async function searchMemories(query: string,k: number = 5): Promise<RetrievedMemory[]> {
-  if (!query.trim()) return [];
+  if (!query.trim()) {
+    console.log('[vectorStore] 查询为空，跳过记忆检索');
+    return [];
+  }
 
   const index = getPineconeIndex();
-  if (!index) return [];
+  if (!index) {
+    console.warn('[vectorStore] Pinecone 索引不可用，跳过记忆检索');
+    return [];
+  }
 
+  console.log(`[vectorStore] 开始记忆检索: query="${query.substring(0, 50)}${query.length > 50 ? '...' : ''}", topK=${k}`);
+  
   // 将查询转换为向量
   // query是单个字符串，需要包装成数组，[query]
   // 只传入一个字符串，返回的二维数组只有一个向量，解构后得到该向量queryEmbedding（一维数组）
+  const embedStartTime = Date.now();
   const [queryEmbedding] = await embedTexts([query]);
-  if (!queryEmbedding || queryEmbedding.length === 0) return [];
+  const embedDuration = Date.now() - embedStartTime;
+  
+  if (!queryEmbedding || queryEmbedding.length === 0) {
+    console.warn('[vectorStore] 向量化失败，跳过记忆检索');
+    return [];
+  }
+  
+  console.log(`[vectorStore] 向量化完成 (耗时: ${embedDuration}ms, 维度: ${queryEmbedding.length})`);
 
   try {
     // 在向量空间中搜索最相似的 k 个向量
+    const searchStartTime = Date.now();
     const result = await index.namespace('piggy').query({
       vector: queryEmbedding,
       topK: k, // 返回最相似的 k 个结果
       includeMetadata: true, // 包含元数据，方便后续处理
     });
+    const searchDuration = Date.now() - searchStartTime;
 
     const matches = result.matches || [];//result.matches才是pinecone返回的结果
+    console.log(`[vectorStore] Pinecone 查询完成 (耗时: ${searchDuration}ms, 匹配数: ${matches.length})`);
+    
     // 将 Pinecone 返回的结果转换为我们的格式
     const items: RetrievedMemory[] = matches
-      .map((m) => {
+      .map((m, i) => {
         const md = (m.metadata || {}) as any;
         const text = (md.text as string) || '';
         if (!text) return null; // 跳过没有文本的结果
@@ -203,18 +223,24 @@ export async function searchMemories(query: string,k: number = 5): Promise<Retri
           sourceId: md.sourceId,
           sourceFilename: md.sourceFilename,
         };
+        const distance = typeof m.score === 'number' ? 1 - m.score : undefined;
+        const similarity = typeof m.score === 'number' ? m.score : undefined;
+        
+        console.log(`[vectorStore]   [${i + 1}] ${metadata.type} (${metadata.datetime}): 相似度=${similarity?.toFixed(3)}, 距离=${distance?.toFixed(3)}`);
+        
         return {
           text,
           metadata,
           // 将相似度分数转换为距离（距离越小越相似）
-          distance: typeof m.score === 'number' ? 1 - m.score : undefined,
+          distance,
         };
       })
       .filter(Boolean) as RetrievedMemory[];
 
+    console.log(`[vectorStore] 记忆检索完成: 返回 ${items.length} 条有效结果`);
     return items;
   } catch (err) {
-    console.error('[vectorStore] Failed to query Pinecone', err);
+    console.error('[vectorStore] Pinecone 查询失败:', err);
     return []; // 查询失败时返回空数组，不影响聊天功能
   }
 }
