@@ -168,6 +168,7 @@ export async function getPeriods() {
 }
 
 // AI 调用的心情记录函数
+// 如果当天已有记录，则更新现有记录；否则创建新记录
 export async function logMoodFromAI({ mood, intensity, note }: { mood: string; intensity: number; note?: string }) {
   const now = new Date();
   const datetime = now.toISOString();
@@ -175,19 +176,39 @@ export async function logMoodFromAI({ mood, intensity, note }: { mood: string; i
 
   await ensureDateKeyColumn();
 
-  await pool.query(
-    'INSERT INTO moods (mood, intensity, note, date_key) VALUES (?, ?, ?, ?)',
-    [mood, intensity, note || '', dateKey]
+  // 先查询当天是否已有记录
+  const existingRecords = await pool.query<{ id: number }>(
+    'SELECT id FROM moods WHERE date_key = ? ORDER BY created_at DESC LIMIT 1',
+    [dateKey]
   );
+
+  const isUpdate = existingRecords.rows && existingRecords.rows.length > 0;
+
+  if (isUpdate) {
+    // 更新现有记录
+    const moodId = existingRecords.rows[0].id;
+    await pool.query(
+      'UPDATE moods SET mood = ?, intensity = ?, note = ? WHERE id = ?',
+      [mood, intensity, note || '', moodId]
+    );
+  } else {
+    // 插入新记录
+    await pool.query(
+      'INSERT INTO moods (mood, intensity, note, date_key) VALUES (?, ?, ?, ?)',
+      [mood, intensity, note || '', dateKey]
+    );
+  }
 
   // Mood alert email
   if (intensity === 3) {
-    sendSuperMoodAlert({ mood, note: note || '', isUpdate: false }).catch((err) => {
+    sendSuperMoodAlert({ mood, note: note || '', isUpdate }).catch((err) => {
       console.error('Failed to send mood alert email', err);
     });
   }
 
   // Vector Store
+  // 注意：如果是更新，我们仍然添加新的记忆，因为向量库中的记忆是只增不减的
+  // 这样可以保留历史记录，AI 可以看到心情的变化过程
   try {
     const textParts = [
       `日期：${now.toLocaleString('zh-CN', { hour12: false })}`,
@@ -217,7 +238,7 @@ export async function logMoodFromAI({ mood, intensity, note }: { mood: string; i
   }
   
   revalidatePath('/');
-  return { success: true };
+  return { success: true, isUpdate };
 }
 
 // AI 调用的经期记录函数
