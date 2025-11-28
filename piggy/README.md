@@ -31,7 +31,7 @@
 - 后端：Next.js Server Actions + Route Handlers、MySQL（默认）与 Neon/Postgres 双引擎、Pinecone、OpenAI Embedding、DeepSeek Chat API。
 - 其它：Nodemailer 邮件告警、date-fns 时间处理、PWA 风格贴纸组件系统。
 
-## 环境变量
+## 环境变量（如果部署到vercel，还需要在vercel控制台里配置）
 - DATABASE_URL
 - GIRLFRIEND_PASSWORD
 - DEEPSEEK_API_KEY
@@ -58,12 +58,13 @@
    npm install
    ```
 3. **初始化数据库**  
-   - 在目标库执行 `migrations/` 里的 SQL（可按序手动运行）。  
+   - 在目标库执行 `migrations/` 里的 SQL（分为psql版本和mysql版本）。  
    - 创建 `moods`, `periods`, `login_logs`, `account_locks` 等表。
 4. **配置 `.env.local`**
-   ```ini
- # neon 云数据库
-DATABASE_URL="postgresql://neondb_owner:npg_t4EyPhBVOJU1@ep-twilight-glitter-ahwj4z24-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+```ini
+ # neon 云数据库（neon云数据库会给一个密钥类似于：）
+DATABASE_URL="postgresql://neondb_owner:npg_t4EysdfdsfJU1@ep-twilight-glitter-ahwj4z24-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
 # 密码
 GIRLFRIEND_PASSWORD="密码"
@@ -89,12 +90,13 @@ SMTP_FROM=qq号@qq.com
 
 # 利用ai进行语义判断（是要采用rag还是正常聊天）
 SMART_QUERY_CLASSIFIER=true（或者false）
+```
 
-   ```
 5. **启动开发服务器**
    ```bash
    npm run dev
    ```
+
 6. 打开 `http://localhost:3000`，输入暗号后即可看到主界面。
 
 ## 数据模型 & 记忆体系
