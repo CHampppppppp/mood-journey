@@ -5,7 +5,7 @@ export const TOOLS: ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'log_mood',
-      description: '记录用户当前的心情、情绪状态。当用户明确表达某种心情（如开心、难过、生气等）时调用。',
+      description: '记录 piggy（用户）当天的心情、情绪状态。**重要规则：1) 只能记录 piggy 的心情，不能记录你自己的感受；2) 只有当 piggy 明确要求记录心情时（如"帮我记一下心情"、"记录我的心情"、"记心情"等）才调用此工具；3) 不要因为 piggy 在聊天中提到了情绪就自动记录，因为一天只能记录一种心情，用户可能只是随口提到，不代表整天的整体心情。** 如果你（Champ）自己有感受或情绪，请用语言表达，不要调用此工具。',
       parameters: {
         type: 'object',
         properties: {
@@ -22,7 +22,7 @@ export const TOOLS: ChatCompletionTool[] = [
           },
           note: {
             type: 'string',
-            description: '关于心情的简短备注或原因',
+            description: '关于 piggy 心情的简短备注或原因（从 piggy 的角度描述，不要包含你自己的感受）',
           },
         },
         required: ['mood', 'intensity'],
