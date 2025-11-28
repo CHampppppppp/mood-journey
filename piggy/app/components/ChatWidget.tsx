@@ -10,6 +10,16 @@ type UiMessage = {
   content: string;
 };
 
+const STICKER_MAP: Record<string, string> = {
+  happy: '/images/happy.jpg',
+  love: '/images/happiness.jpg',
+  sad: '/images/sad.jpg',
+  angry: '/images/angry.jpg',
+  tired: '/images/tired.jpg',
+  excited: '/images/fortnitecat1.jpg',
+  neutral: '/images/penguin.jpg',
+};
+
 function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -34,6 +44,44 @@ function ChatWidget() {
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [open, messages.length]);
+
+  const renderMessageContent = (content: string) => {
+    // 如果内容为空，不渲染
+    if (!content) return null;
+
+    const stickerRegex = /\[STICKER:(\w+)\]/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = stickerRegex.exec(content)) !== null) {
+      // 添加前面的文本
+      if (match.index > lastIndex) {
+        parts.push(<span key={`text-${lastIndex}`}>{content.substring(lastIndex, match.index)}</span>);
+      }
+      
+      // 添加贴纸
+      const category = match[1];
+      const src = STICKER_MAP[category] || STICKER_MAP['happy']; // 默认 fallback
+      parts.push(
+        <div key={`sticker-${match.index}`} className="my-2 relative w-32 h-32 rounded-xl overflow-hidden border-2 border-black shadow-[3px_3px_0_#1a1a1a]">
+           <Image src={src} alt={category} fill className="object-cover" />
+        </div>
+      );
+
+      lastIndex = stickerRegex.lastIndex;
+    }
+
+    // 添加剩余文本
+    if (lastIndex < content.length) {
+      parts.push(<span key={`text-${lastIndex}`}>{content.substring(lastIndex)}</span>);
+    }
+    
+    // 如果没有任何匹配，直接返回 content
+    if (parts.length === 0) return content;
+
+    return <>{parts}</>;
+  };
 
   /**
    * 发送消息处理函数
@@ -193,7 +241,7 @@ function ChatWidget() {
 
       {/* 聊天面板 */}
       {open && (
-        <div className="fixed bottom-28 right-3 md:right-6 z-[9999] w-[26rem] max-w-[95vw] h-[32rem] rounded-2xl border-2 border-black bg-[#fff9fb] shadow-[4px_4px_0_#1a1a1a] flex flex-col overflow-hidden">
+        <div className="fixed bottom-28 right-3 md:right-6 z-[9999] w-[26rem] max-w-[95vw] h-[32rem] rounded-2xl border-2 border-black bg-[#fff9fb] shadow-[4px_4px_0_#1a1a1a] flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
           <div className="flex items-center justify-between px-3 py-2 border-b-2 border-black bg-[#ffd6e7]">
             <div className="flex items-center gap-2">
               <div className="relative h-7 w-7 overflow-hidden rounded-full border border-black">
@@ -210,7 +258,7 @@ function ChatWidget() {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="text-xs font-bold px-2 py-1 rounded-lg border border-black bg-white hover:bg-gray-100"
+              className="text-xs font-bold px-2 py-1 rounded-lg border border-black bg-white hover:bg-gray-100 transition-colors"
             >
               ×
             </button>
@@ -221,7 +269,7 @@ function ChatWidget() {
             className="flex-1 px-3 py-2 space-y-2 overflow-y-auto text-xs bg-[#fffdfd]"
           >
             {messages.length === 0 && (
-              <div className="text-[11px] text-gray-500">
+              <div className="text-[11px] text-gray-500 text-center py-4">
                 可以跟我聊今天的心情，或者随便提一件以前发生的事，我会尽量帮你一起回忆～ ♡
               </div>
             )}
@@ -232,17 +280,26 @@ function ChatWidget() {
                   }`}
               >
                 <div
-                  className={`max-w-[80%] whitespace-pre-wrap rounded-2xl border-2 px-2 py-1.5 ${m.role === 'user'
+                  className={`max-w-[85%] whitespace-pre-wrap rounded-2xl border-2 px-3 py-2 ${m.role === 'user'
                     ? 'bg-[#d0f0ff] border-black'
                     : 'bg-white border-black'
                     }`}
                 >
-                  {m.content}
+                  {renderMessageContent(m.content)}
                 </div>
               </div>
             ))}
-            {loading && (
-              <div className="text-[11px] text-gray-500">Champ 正在努力回想中…</div>
+            {loading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
+               // 这是一个兜底，只有在还没有创建 assistant message 的短暂间隙显示，
+               // 实际上 handleSend 里立即创建了空的 assistant message，所以这个可能不会显示。
+               // 但如果是 Function Calling 导致的延迟（虽然我们用空消息占位了），
+               // 用户会看到一个空气泡，直到内容回来。
+               // 我们可以给空气泡加个 loading 动画
+               <div className="flex justify-start">
+                 <div className="bg-white border-2 border-black rounded-2xl px-3 py-2">
+                   <span className="animate-pulse">...</span>
+                 </div>
+               </div>
             )}
           </div>
 
@@ -253,14 +310,14 @@ function ChatWidget() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="想对 Champ 说什么呢？按 Enter 发送，Shift+Enter 换行～"
-              className="w-full resize-none rounded-lg border border-gray-300 px-2 py-1 text-xs outline-none focus:border-black"
+              className="w-full resize-none rounded-lg border border-gray-300 px-2 py-1 text-xs outline-none focus:border-black transition-colors"
             />
             <div className="mt-1 flex justify-end">
               <button
                 type="button"
                 onClick={() => void handleSend()}
                 disabled={loading || !input.trim()}
-                className="inline-flex items-center rounded-lg border-2 border-black bg-[#ffd6e7] px-3 py-1 text-xs font-bold shadow-[2px_2px_0_#1a1a1a] disabled:opacity-50 disabled:shadow-none"
+                className="inline-flex items-center rounded-lg border-2 border-black bg-[#ffd6e7] px-3 py-1 text-xs font-bold shadow-[2px_2px_0_#1a1a1a] disabled:opacity-50 disabled:shadow-none hover:shadow-[3px_3px_0_#1a1a1a] hover:-translate-y-0.5 transition-all active:translate-y-0 active:shadow-[1px_1px_0_#1a1a1a]"
               >
                 发送 ♡
               </button>
@@ -274,5 +331,3 @@ function ChatWidget() {
 }
 
 export default ChatWidget;
-
-

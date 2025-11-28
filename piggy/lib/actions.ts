@@ -154,3 +154,66 @@ export async function getPeriods() {
   return rows as Period[];
 }
 
+// AI 调用的心情记录函数
+export async function logMoodFromAI({ mood, intensity, note }: { mood: string; intensity: number; note?: string }) {
+  const now = new Date();
+  const datetime = now.toISOString();
+  const dateKey = now.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+
+  await ensureDateKeyColumn();
+
+  await pool.query(
+    'INSERT INTO moods (mood, intensity, note, date_key) VALUES (?, ?, ?, ?)',
+    [mood, intensity, note || '', dateKey]
+  );
+
+  // Mood alert email
+  if (intensity === 3) {
+    sendSuperMoodAlert({ mood, note: note || '', isUpdate: false }).catch((err) => {
+      console.error('Failed to send mood alert email', err);
+    });
+  }
+
+  // Vector Store
+  try {
+    const textParts = [
+      `日期：${now.toLocaleString('zh-CN', { hour12: false })}`,
+      `心情类型：${mood}`,
+      `强烈程度：${intensity}`,
+    ];
+    if (note) {
+      textParts.push(`备注：${note}`);
+    }
+    const memoryText = textParts.join('\n');
+
+    const memory: MemoryRecord = {
+      id: `mood-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      text: memoryText,
+      metadata: {
+        type: 'mood',
+        author: 'piggy',
+        datetime,
+      },
+    };
+
+    addMemories([memory]).catch((err) => {
+      console.error('[logMoodFromAI] Failed to add memory to vector store', err);
+    });
+  } catch (err) {
+    console.error('[logMoodFromAI] Unexpected error when preparing memory', err);
+  }
+  
+  revalidatePath('/');
+  return { success: true };
+}
+
+// AI 调用的经期记录函数
+export async function trackPeriodFromAI({ startDate }: { startDate?: string }) {
+  const date = startDate ? new Date(startDate) : new Date();
+  await pool.query(
+    'INSERT INTO periods (start_date) VALUES (?)',
+    [date]
+  );
+  revalidatePath('/');
+  return { success: true, date: date.toISOString() };
+}

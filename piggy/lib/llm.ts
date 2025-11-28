@@ -1,8 +1,12 @@
 import OpenAI from 'openai';
+import type { ChatCompletionTool } from 'openai/resources/chat/completions';
 
 export type ChatMessage = {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string | null;
+  tool_calls?: any[];
+  tool_call_id?: string;
+  name?: string;
 };
 
 type QueryType = 'realtime' | 'memory' | 'mixed';
@@ -63,6 +67,7 @@ export function getSystemPrompt() {
 type ChatOptions = {
   messages: ChatMessage[];
   context?: string;
+  tools?: ChatCompletionTool[];
 };
 
 /**
@@ -95,10 +100,23 @@ export async function callDeepseekChat(options: ChatOptions) {
 
   const completion = await deepseekClient.chat.completions.create({
     model: 'deepseek-chat',
-    messages: finalMessages,
+    messages: finalMessages as any,
+    tools: options.tools,
   });
 
-  const reply = completion.choices[0]?.message?.content || '';
+  const message = completion.choices[0]?.message;
+
+  // 如果有工具调用，返回完整的 message 对象
+  if (message.tool_calls && message.tool_calls.length > 0) {
+    // 转换为我们的 ChatMessage 格式
+    return {
+      role: message.role,
+      content: message.content,
+      tool_calls: message.tool_calls,
+    } as ChatMessage;
+  }
+
+  const reply = message?.content || '';
   return reply;
 }
 
@@ -121,10 +139,12 @@ export async function callDeepseekChat(options: ChatOptions) {
 export async function streamDeepseekChat(options: ChatOptions) {
   const finalMessages = buildMessages(options);
 
+  // 流式暂不支持 tools，或者需要复杂处理，暂时保留原样
   const stream = await deepseekClient.chat.completions.create({
     model: 'deepseek-chat',
-    messages: finalMessages,
+    messages: finalMessages as any,
     stream: true,
+    // tools: options.tools, // 暂时不在流式中启用 tools
   });
 
   // 异步生成器：从流中提取文本内容
@@ -284,7 +304,7 @@ async function classifyWithLLM(query: string): Promise<QueryType | null> {
           role: 'user',
           content: query.trim(),
         },
-      ],
+      ] as any,
     });
 
     const answer =
@@ -374,5 +394,3 @@ export function getCurrentInfo() {
     timeZone: 'Asia/Shanghai (UTC+8)'
   };
 }
-
-

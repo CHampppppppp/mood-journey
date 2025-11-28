@@ -45,7 +45,7 @@ const openaiEmbedClient = OPENAI_API_KEY
   ? new OpenAI({
       apiKey: OPENAI_API_KEY,
       baseURL: process.env.OPENAI_API_BASE,
-      timeout: 15000, // 15s 超时时间，避免请求卡太久
+      timeout: 5000, // 5s 超时时间，避免请求卡太久影响用户体验
     })
   : null;
 
