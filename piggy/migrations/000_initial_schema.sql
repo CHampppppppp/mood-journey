@@ -1,6 +1,8 @@
--- Migration: 初始数据库结构
+-- Migration: 初始数据库结构 (MySQL 版本)
 -- 创建核心表：moods, periods, account_locks, login_logs
 -- 兼容 MySQL 5.7+
+-- 
+-- 注意：如需 PostgreSQL 版本，请使用 000_initial_schema.postgres.sql
 
 -- ============================================
 -- moods 表：心情记录
