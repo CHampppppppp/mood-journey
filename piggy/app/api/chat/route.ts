@@ -10,6 +10,55 @@ import { searchMemories, addMemories, type MemoryRecord } from '@/lib/vectorStor
 import { TOOLS } from '@/lib/tools';
 import { logMoodFromAI, trackPeriodFromAI } from '@/lib/actions';
 
+/**
+ * 获取天气信息
+ * 支持多种天气API：
+ * 1. OpenWeatherMap (需要 OPENWEATHER_API_KEY)
+ * 2. 高德地图API (需要 AMAP_API_KEY，更适合中国城市)
+ */
+async function getWeatherInfo(city: string): Promise<string> {
+  // 优先使用高德地图API（更适合中国城市）
+  const amapKey = process.env.AMAP_API_KEY;
+  if (amapKey) {
+    try {
+      const response = await fetch(
+        `https://restapi.amap.com/v3/weather/weatherInfo?key=${amapKey}&city=${encodeURIComponent(city)}&extensions=base&output=json`
+      );
+      const data = await response.json();
+      
+      if (data.status === '1' && data.lives && data.lives.length > 0) {
+        const weather = data.lives[0];
+        return `【${weather.city}天气】\n天气：${weather.weather}\n温度：${weather.temperature}℃\n风向：${weather.winddirection}\n风力：${weather.windpower}级\n湿度：${weather.humidity}%\n发布时间：${weather.reporttime}`;
+      } else {
+        return `抱歉，无法获取 ${city} 的天气信息。`;
+      }
+    } catch (error) {
+      console.error('[getWeatherInfo] 高德地图API调用失败:', error);
+    }
+  }
+
+  // 备用：使用 OpenWeatherMap API
+  const openWeatherKey = process.env.OPENWEATHER_API_KEY;
+  if (openWeatherKey) {
+    try {
+      const response = await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${openWeatherKey}&units=metric&lang=zh_cn`
+      );
+      const data = await response.json();
+      
+      if (data.cod === 200) {
+        return `【${data.name}天气】\n天气：${data.weather[0].description}\n温度：${Math.round(data.main.temp)}℃\n体感温度：${Math.round(data.main.feels_like)}℃\n最高温度：${Math.round(data.main.temp_max)}℃\n最低温度：${Math.round(data.main.temp_min)}℃\n湿度：${data.main.humidity}%\n风速：${data.wind?.speed || 0} m/s`;
+      } else {
+        return `抱歉，无法获取 ${city} 的天气信息。`;
+      }
+    } catch (error) {
+      console.error('[getWeatherInfo] OpenWeatherMap API调用失败:', error);
+    }
+  }
+
+  return `抱歉，天气服务暂时不可用。请确保已配置天气API密钥（AMAP_API_KEY 或 OPENWEATHER_API_KEY）。`;
+}
+
 type ApiChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -98,6 +147,7 @@ export async function POST(req: NextRequest) {
     let finished = false;
     let loopCount = 0;
     const MAX_LOOPS = 5; // 防止死循环
+    let needsRefresh = false; // 标记是否需要刷新页面（数据库更新时）
 
     while (!finished && loopCount < MAX_LOOPS) {
       loopCount++;
@@ -151,9 +201,11 @@ export async function POST(req: NextRequest) {
             if (fnName === 'log_mood') {
               await logMoodFromAI(args as any);
               result = { success: true, message: '心情已记录。' };
+              needsRefresh = true; // 标记需要刷新页面
             } else if (fnName === 'track_period') {
               await trackPeriodFromAI(args as any);
               result = { success: true, message: '经期已记录。' };
+              needsRefresh = true; // 标记需要刷新页面
             } else if (fnName === 'save_memory') {
               const content = (args as any).content;
               if (content) {
@@ -179,6 +231,13 @@ export async function POST(req: NextRequest) {
               result = { 
                 success: true, 
                 message: `Sticker [${category}] displayed. Please mention it in your response and append [STICKER:${category}] at the end.` 
+              };
+            } else if (fnName === 'get_weather') {
+              const city = (args as any).city || '北京'; // 默认城市
+              const weatherInfo = await getWeatherInfo(city);
+              result = { 
+                success: true, 
+                message: weatherInfo 
               };
             } else {
               result = { success: false, message: 'Unknown tool.' };
@@ -209,11 +268,28 @@ export async function POST(req: NextRequest) {
     // 这样前端代码不需要修改
     if (body?.stream) {
       const encoder = new TextEncoder();
+      const logs: string[] = []; // 收集日志信息
+      
+      // 收集关键日志信息
+      logs.push(`[api/chat:${requestId}] 用户消息: "${query}"`);
+      if (needsRefresh) {
+        logs.push(`[api/chat:${requestId}] 数据库已更新，需要刷新页面`);
+      }
+      
       const stream = new ReadableStream({
         start(controller) {
+          // 先发送日志信息（前端会解析但不显示）
+          logs.forEach(log => {
+            controller.enqueue(encoder.encode(`[LOG]${log}[END_LOG]`));
+          });
+          
           // 将完整回复一次性作为一个 chunk 发送
           // 虽然不是真正的流式（逐字），但兼容前端的 reader 逻辑
           controller.enqueue(encoder.encode(finalReply));
+          // 如果需要刷新，在流末尾添加特殊标记
+          if (needsRefresh) {
+            controller.enqueue(encoder.encode('\n\n[REFRESH_PAGE]'));
+          }
           controller.close();
         },
       });
@@ -222,6 +298,7 @@ export async function POST(req: NextRequest) {
         headers: {
           'Content-Type': 'text/plain; charset=utf-8',
           'Cache-Control': 'no-cache',
+          ...(needsRefresh ? { 'X-Refresh-Page': 'true' } : {}),
         },
       });
     }

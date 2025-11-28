@@ -22,7 +22,7 @@ export const TOOLS: ChatCompletionTool[] = [
           },
           note: {
             type: 'string',
-            description: '关于 piggy 心情的简短备注或原因（从 piggy 的角度描述，不要包含你自己的感受）',
+            description: '关于心情的简短备注或原因。**重要：必须用第一人称"我"来写，就像 piggy 自己写的一样。不要用第三人称"piggy说..."或"piggy..."。** 例如："我今天好难过，可能是因为生理期不舒服"而不是"piggy说今天好难过，可能是因为生理期不舒服"。',
           },
         },
         required: ['mood', 'intensity'],
@@ -78,6 +78,23 @@ export const TOOLS: ChatCompletionTool[] = [
           },
         },
         required: ['category'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_weather',
+      description: '获取指定城市的实时天气信息。当用户询问天气时调用此工具。',
+      parameters: {
+        type: 'object',
+        properties: {
+          city: {
+            type: 'string',
+            description: '城市名称，例如：北京、上海、深圳。如果不提供，默认查询用户所在城市或常用城市。',
+          },
+        },
+        required: [],
       },
     },
   },

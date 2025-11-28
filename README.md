@@ -44,6 +44,12 @@
 
   男朋友：在聊到开心或难过的话题时，可以在回复中直接发表情包（如 [STICKER:happy]），前端会自动渲染成大图贴纸。
 
+  🌤️ 天气查询 (get_weather)
+
+  女朋友：“今天北京天气怎么样？”
+
+  男朋友：自动调用天气API获取实时天气信息并回复。
+
 
 - **记忆上传中心**  
   `/upload` 页面允许把文本/Markdown 或纯文字笔记切分后写入 Pinecone，方便在聊天时引用。  
@@ -111,6 +117,12 @@ SMTP_FROM=qq号@qq.com
 
 # 利用 AI 进行语义判断（是要采用 RAG 还是正常聊天）
 SMART_QUERY_CLASSIFIER=true
+
+# 天气API配置（二选一即可，推荐使用高德地图API，更适合中国城市）
+# 高德地图API（推荐，免费额度充足，适合中国城市）
+AMAP_API_KEY="高德地图API密钥"
+# 或使用 OpenWeatherMap API（国际通用）
+# OPENWEATHER_API_KEY="OpenWeatherMap API密钥"
 
 # CRON Job（每日定期执行某些任务，这里是检查经期）
 CRON_SECRET="这个值自己随便取"

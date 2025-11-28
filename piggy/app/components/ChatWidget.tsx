@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 type UiMessage = {
@@ -27,6 +28,7 @@ const SESSION_TIME_KEY = 'chat-session-time';
 const SESSION_TIMEOUT = 30 * 60 * 1000; // 30分钟
 
 function ChatWidget() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
@@ -316,6 +318,8 @@ function ChatWidget() {
       }
 
       const decoder = new TextDecoder('utf-8');
+      let fullContent = ''; // 用于检测刷新标记
+      let shouldRefresh = false; // 是否需要刷新页面
 
       /**
        * 逐块读取流式内容，并实时更新最后一条 assistant 消息
@@ -332,27 +336,58 @@ function ChatWidget() {
         const chunkText = decoder.decode(value, { stream: true });
         if (!chunkText) continue; // 跳过空块
 
-        // 更新最后一条助手消息，追加新接收到的文本
-        setMessages((prev) => {
-          const next = [...prev];
-          const lastIndex = next.length - 1;
-          if (lastIndex >= 0 && next[lastIndex].role === 'assistant') {
-            next[lastIndex] = {
-              ...next[lastIndex],
-              content: next[lastIndex].content + chunkText,
-            };
-          }
-          // 节流保存，减少保存频率
-          saveMessages(next, false);
-          return next;
-        });
+        fullContent += chunkText;
+
+        // 检查是否需要刷新页面（检测特殊标记）
+        if (fullContent.includes('[REFRESH_PAGE]')) {
+          shouldRefresh = true;
+          // 移除标记，不显示在消息中
+          const cleanContent = fullContent.replace('[REFRESH_PAGE]', '').trim();
+          setMessages((prev) => {
+            const next = [...prev];
+            const lastIndex = next.length - 1;
+            if (lastIndex >= 0 && next[lastIndex].role === 'assistant') {
+              next[lastIndex] = {
+                ...next[lastIndex],
+                content: cleanContent,
+              };
+            }
+            saveMessages(next, true);
+            return next;
+          });
+        } else {
+          // 更新最后一条助手消息，追加新接收到的文本
+          setMessages((prev) => {
+            const next = [...prev];
+            const lastIndex = next.length - 1;
+            if (lastIndex >= 0 && next[lastIndex].role === 'assistant') {
+              next[lastIndex] = {
+                ...next[lastIndex],
+                content: next[lastIndex].content + chunkText,
+              };
+            }
+            // 节流保存，减少保存频率
+            saveMessages(next, false);
+            return next;
+          });
+        }
       }
 
       // 流结束时立即保存一次，确保数据不丢失
-      setMessages((prev) => {
-        saveMessages(prev, true);
-        return prev;
-      });
+      if (!shouldRefresh) {
+        setMessages((prev) => {
+          saveMessages(prev, true);
+          return prev;
+        });
+      }
+
+      // 如果需要刷新页面（数据库已更新），延迟一小段时间后刷新
+      if (shouldRefresh) {
+        // 延迟刷新，让用户看到AI的回复
+        setTimeout(() => {
+          router.refresh();
+        }, 500);
+      }
     } catch (err) {
       console.error(`[ChatWidget:${requestId}] 请求异常:`, err instanceof Error ? err.message : String(err));
 
