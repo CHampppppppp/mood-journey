@@ -52,7 +52,11 @@
  # neon 云数据库（neon云数据库会给一个密钥类似于：）
 DATABASE_URL="postgresql://neondb_owner:npg_t4EysdfdsfJU1@ep-twilight-glitter-ahwj4z24-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
-# 密码
+# 本地mysql数据库
+MYSQL_DATABASE="数据库名"
+MYSQL_PASSWORD="数据库密码"
+
+# 魔法书密码
 GIRLFRIEND_PASSWORD="密码"
 
 # deepseek聊天
