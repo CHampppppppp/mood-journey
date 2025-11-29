@@ -1,3 +1,13 @@
+/**
+ * 将图片转换为 WebP 格式
+ * 
+ * 这个脚本用于将指定目录下的图片转换为 WebP 格式，以减少文件大小。
+ * 
+ * 使用方式：
+ * ```bash
+ * npm run convert-images
+ * ```
+ */
 import sharp from 'sharp';
 import { readdir, stat } from 'fs/promises';
 import { join, extname, basename } from 'path';
