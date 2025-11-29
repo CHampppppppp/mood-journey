@@ -1,3 +1,17 @@
+/**
+ * Vector Store Service - 向量存储服务 (RAG)
+ * 
+ * 这个文件负责管理长期记忆的向量化存储和检索，实现 RAG (Retrieval-Augmented Generation)。
+ * 
+ * 主要功能：
+ * 1. 向量化 (Embedding)：使用 OpenAI (text-embedding-3-small) 将文本转换为向量。
+ * 2. 存储 (Upsert)：将向量和元数据存储到 Pinecone 数据库。
+ * 3. 检索 (Search)：根据查询文本，在 Pinecone 中搜索语义最相似的记录。
+ * 4. 删除 (Delete)：从向量库中删除指定的记忆。
+ * 
+ * 依赖：Pinecone, OpenAI Embedding API
+ */
+
 import { Pinecone } from '@pinecone-database/pinecone';
 import OpenAI from 'openai';
 
@@ -141,6 +155,7 @@ export async function addMemories(records: MemoryRecord[]): Promise<void> {
 }
 
 export type RetrievedMemory = {
+  id: string;
   text: string;
   metadata: MemoryMetadata;
   distance?: number;//相似度分数
@@ -229,6 +244,7 @@ export async function searchMemories(query: string,k: number = 5): Promise<Retri
         console.log(`[vectorStore]   [${i + 1}] ${metadata.type} (${metadata.datetime}): 相似度=${similarity?.toFixed(3)}, 距离=${distance?.toFixed(3)}`);
         
         return {
+          id: m.id,
           text,
           metadata,
           // 将相似度分数转换为距离（距离越小越相似）
@@ -242,5 +258,25 @@ export async function searchMemories(query: string,k: number = 5): Promise<Retri
   } catch (err) {
     console.error('[vectorStore] Pinecone 查询失败:', err);
     return []; // 查询失败时返回空数组，不影响聊天功能
+  }
+}
+
+/**
+ * 从向量数据库中删除记忆
+ * 
+ * @param ids - 要删除的记忆 ID 数组
+ */
+export async function deleteMemories(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+
+  const index = getPineconeIndex();
+  if (!index) return;
+
+  try {
+    await index.namespace('piggy').deleteMany(ids);
+    console.log(`[vectorStore] 已删除 ${ids.length} 条记忆: ${ids.join(', ')}`);
+  } catch (err) {
+    console.error('[vectorStore] 删除记忆失败:', err);
+    throw err;
   }
 }

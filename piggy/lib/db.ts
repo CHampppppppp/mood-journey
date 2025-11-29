@@ -1,3 +1,15 @@
+/**
+ * Database Connection - 数据库连接层
+ * 
+ * 这个文件统一了不同环境下的数据库连接方式，提供一致的查询接口。
+ * 主要功能：
+ * 1. 环境适配：根据环境变量自动切换数据库客户端。
+ *    - 开发环境 (Development): 使用 MySQL (mysql2)
+ *    - 生产环境 (Production): 使用 Postgres/Neon (@neondatabase/serverless)
+ * 2. SQL 适配：统一了参数占位符（将 Postgres 的 $1, $2 转换为 ? 或反之），让上层业务代码只需关注一种写法。
+ * 3. 连接池管理：配置和导出数据库连接池。
+ */
+
 import { Pool as NeonPool } from '@neondatabase/serverless';
 import mysql from 'mysql2/promise';
 

@@ -8,7 +8,19 @@ import {
 } from '@/lib/llm';
 import { searchMemories, addMemories, type MemoryRecord } from '@/lib/vectorStore';
 import { TOOLS } from '@/lib/tools';
-import { logMoodFromAI, trackPeriodFromAI } from '@/lib/actions';
+import { 
+  logMoodFromAI, 
+  trackPeriodFromAI,
+  listMoodsFromAI,
+  updateMoodFromAI,
+  deleteMoodFromAI,
+  listPeriodsFromAI,
+  updatePeriodFromAI,
+  deletePeriodFromAI,
+  listMemoriesFromAI,
+  updateMemoryFromAI,
+  deleteMemoryFromAI,
+} from '@/lib/actions';
 import * as jose from 'jose';
 
 // JWT Token 缓存，避免每次请求都重新生成
@@ -334,15 +346,44 @@ export async function POST(req: NextRequest) {
           let result = { success: true, message: 'Tool executed successfully.' };
 
           try {
+            // ==================== 心情记录相关工具 ====================
             if (fnName === 'log_mood') {
               await logMoodFromAI(args as any);
               result = { success: true, message: '心情已记录。' };
-              needsRefresh = true; // 标记需要刷新页面
-            } else if (fnName === 'track_period') {
+              needsRefresh = true;
+            } else if (fnName === 'list_moods') {
+              const listResult = await listMoodsFromAI(args as any);
+              result = listResult;
+              // 查询不需要刷新页面
+            } else if (fnName === 'update_mood') {
+              const updateResult = await updateMoodFromAI(args as any);
+              result = updateResult;
+              if (updateResult.success) needsRefresh = true;
+            } else if (fnName === 'delete_mood') {
+              const deleteResult = await deleteMoodFromAI(args as any);
+              result = deleteResult;
+              if (deleteResult.success) needsRefresh = true;
+            }
+            // ==================== 经期记录相关工具 ====================
+            else if (fnName === 'track_period') {
               await trackPeriodFromAI(args as any);
               result = { success: true, message: '经期已记录。' };
-              needsRefresh = true; // 标记需要刷新页面
-            } else if (fnName === 'save_memory') {
+              needsRefresh = true;
+            } else if (fnName === 'list_periods') {
+              const listResult = await listPeriodsFromAI(args as any);
+              result = listResult;
+              // 查询不需要刷新页面
+            } else if (fnName === 'update_period') {
+              const updateResult = await updatePeriodFromAI(args as any);
+              result = updateResult;
+              if (updateResult.success) needsRefresh = true;
+            } else if (fnName === 'delete_period') {
+              const deleteResult = await deletePeriodFromAI(args as any);
+              result = deleteResult;
+              if (deleteResult.success) needsRefresh = true;
+            }
+            // ==================== 其他工具 ====================
+            else if (fnName === 'save_memory') {
               const content = (args as any).content;
               if (content) {
                 const now = new Date();
@@ -362,6 +403,17 @@ export async function POST(req: NextRequest) {
               } else {
                 result = { success: false, message: 'Content is required.' };
               }
+            } else if (fnName === 'list_memories') {
+              const listResult = await listMemoriesFromAI(args as any);
+              result = listResult;
+            } else if (fnName === 'update_memory') {
+              const updateResult = await updateMemoryFromAI(args as any);
+              result = updateResult;
+              if (updateResult.success) needsRefresh = true;
+            } else if (fnName === 'delete_memory') {
+              const deleteResult = await deleteMemoryFromAI(args as any);
+              result = deleteResult;
+              if (deleteResult.success) needsRefresh = true;
             } else if (fnName === 'show_sticker') {
               const category = (args as any).category;
               result = { 
