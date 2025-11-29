@@ -119,9 +119,14 @@ SMTP_FROM=qq号@qq.com
 SMART_QUERY_CLASSIFIER=true
 
 # 天气API（和风天气）
-QWEATHER_API_KEY="你的和风天气API Key"
-# 可选：和风天气 API Host (默认为 devapi.qweather.com，新版控制台项目可能是 xxx.qweatherapi.com)
-# QWEATHER_API_HOST="jy7p42D47d.re.qweatherapi.com"
+QWEATHER_AUTH_TYPE=bearer
+QWEATHER_API_HOST=参考控制台设置里面的api host
+QWEATHER_KEY_ID=参考控制台里的凭据ID
+QWEATHER_PROJECT_ID=参考控制台里的项目ID
+QWEATHER_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+MC4CAsdsBQYDK2VwBCIEICcFdZzcMCh7sGTMOnZIW9Sz05dIXjFRx94jy9CsgjW8
+-----END PRIVATE KEY-----
+"（生成的私钥，还要上传公钥到控制台）
 
 
 
