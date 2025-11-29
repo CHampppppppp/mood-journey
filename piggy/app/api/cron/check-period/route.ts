@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'; // 确保不被缓存
 
 type PeriodRecord = {
   id: number;
-  start_date: Date | string;
+  created_at: Date | string; // 使用 created_at 而非 start_date，避免时区问题
 };
 
 type AlertRecord = {
@@ -21,19 +21,22 @@ type AlertRecord = {
  * 1. 如果没有记录，无法预测，返回 null
  * 2. 如果只有 1 条记录，假设周期为 28 天
  * 3. 如果有多条记录，计算最近 6 次记录的平均周期
+ * 
+ * 注意：使用 created_at 而非 start_date，因为 start_date 可能因服务器 UTC 时区导致日期偏移
  */
 async function predictNextPeriod(): Promise<{ nextDate: Date; avgCycle: number } | null> {
   // 获取最近的经期记录（最多取最近 7 条来计算平均值）
+  // 使用 created_at 排序和计算，避免时区问题
   const { rows } = await pool.query<PeriodRecord>(
-    `SELECT start_date FROM periods ORDER BY start_date DESC LIMIT 7`
+    `SELECT created_at FROM periods ORDER BY created_at DESC LIMIT 7`
   );
 
   if (rows.length === 0) {
     return null;
   }
 
-  // 确保 start_date 是 Date 对象
-  const dates = rows.map((r) => new Date(r.start_date));
+  // 使用 created_at 作为经期开始日期
+  const dates = rows.map((r) => new Date(r.created_at));
   const lastPeriod = dates[0];
 
   // 只有一条记录，默认 28 天

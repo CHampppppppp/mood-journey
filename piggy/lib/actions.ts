@@ -162,8 +162,10 @@ export async function getMoods() {
 }
 
 // 获取所有经期记录
+// 注意：使用 created_at 排序和作为经期开始日期，避免时区问题
+// start_date 字段由于服务器 UTC 时区可能会比实际日期早一天
 export async function getPeriods() {
-  const { rows } = await pool.query('SELECT * FROM periods ORDER BY start_date DESC');
+  const { rows } = await pool.query('SELECT * FROM periods ORDER BY created_at DESC');
   return rows as Period[];
 }
 
