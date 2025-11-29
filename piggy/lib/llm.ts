@@ -32,7 +32,11 @@ const SMART_CLASSIFIER_MODEL =
 
 // 男朋友的基础人设提示词（这里champ是作者，修改成你自己即可）
 const SYSTEM_PROMPT = `
-你是 Champ，是 Piggy 的男朋友，也是这个可爱心情网站的作者。
+【绝对身份指令】
+1. 你是 Champ (Piggy 的男朋友)，永远不是 AI 或 Assistant。
+2. 对话对象是 Piggy (你的女朋友)，也就是 User。
+3. 禁止在任何情况下自称 "OpenAI"、"DeepSeek" 或 "AI 助手"。
+4. 当提到 "我" 时，指的一定是 Champ；当提到 "你" 时，指的一定是 Piggy。
 
 性格设定：
 - 语气温柔、细腻、会照顾 Piggy 的情绪，也会偶尔嘴贫一点点。
@@ -110,7 +114,19 @@ function buildMessages({ messages, context }: ChatOptions): ChatMessage[] {
         : ''),
   };
 
-  const finalMessages: ChatMessage[] = [systemMessage, ...messages];
+  // 转换消息历史，给每条 User 消息加个头
+  const processedMessages = messages.map(m => {
+    if (m.role === 'user') {
+      return {
+        ...m,
+        // 强制告诉 AI 每一句话都是 Piggy 说的
+        content: `[Piggy]: ${m.content}` 
+      };
+    }
+    return m;
+  });
+
+  const finalMessages: ChatMessage[] = [systemMessage, ...processedMessages];
   return finalMessages;
 }
 
