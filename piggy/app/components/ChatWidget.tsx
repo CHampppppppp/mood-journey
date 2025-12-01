@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import ReactMarkdown from 'react-markdown';
 
 type UiMessage = {
   id: string;
@@ -198,9 +199,31 @@ function ChatWidget() {
     let match;
 
     while ((match = stickerRegex.exec(content)) !== null) {
-      // 添加前面的文本
+      // 添加前面的文本（使用 Markdown 渲染）
       if (match.index > lastIndex) {
-        parts.push(<span key={`text-${lastIndex}`}>{content.substring(lastIndex, match.index)}</span>);
+        const textContent = content.substring(lastIndex, match.index);
+        parts.push(
+          <ReactMarkdown
+            key={`markdown-${lastIndex}`}
+            components={{
+              p: ({ children }) => <span>{children}</span>,
+              strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+              em: ({ children }) => <em className="italic">{children}</em>,
+              code: ({ children }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+              pre: ({ children }) => <pre className="bg-gray-100 p-2 rounded text-xs font-mono overflow-x-auto my-1">{children}</pre>,
+              ul: ({ children }) => <ul className="list-disc list-inside my-1 space-y-0.5">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal list-inside my-1 space-y-0.5">{children}</ol>,
+              li: ({ children }) => <li className="ml-2">{children}</li>,
+              blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-300 pl-2 my-1 italic">{children}</blockquote>,
+              a: ({ href, children }) => <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+              h1: ({ children }) => <h1 className="text-base font-bold my-1">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-sm font-bold my-1">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-xs font-bold my-1">{children}</h3>,
+            }}
+          >
+            {textContent}
+          </ReactMarkdown>
+        );
       }
 
       // 添加贴纸
@@ -215,13 +238,57 @@ function ChatWidget() {
       lastIndex = stickerRegex.lastIndex;
     }
 
-    // 添加剩余文本
+    // 添加剩余文本（使用 Markdown 渲染）
     if (lastIndex < content.length) {
-      parts.push(<span key={`text-${lastIndex}`}>{content.substring(lastIndex)}</span>);
+      const textContent = content.substring(lastIndex);
+      parts.push(
+        <ReactMarkdown
+          key={`markdown-${lastIndex}`}
+          components={{
+            p: ({ children }) => <span>{children}</span>,
+            strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+            em: ({ children }) => <em className="italic">{children}</em>,
+            code: ({ children }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+            pre: ({ children }) => <pre className="bg-gray-100 p-2 rounded text-xs font-mono overflow-x-auto my-1">{children}</pre>,
+            ul: ({ children }) => <ul className="list-disc list-inside my-1 space-y-0.5">{children}</ul>,
+            ol: ({ children }) => <ol className="list-decimal list-inside my-1 space-y-0.5">{children}</ol>,
+            li: ({ children }) => <li className="ml-2">{children}</li>,
+            blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-300 pl-2 my-1 italic">{children}</blockquote>,
+            a: ({ href, children }) => <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+            h1: ({ children }) => <h1 className="text-base font-bold my-1">{children}</h1>,
+            h2: ({ children }) => <h2 className="text-sm font-bold my-1">{children}</h2>,
+            h3: ({ children }) => <h3 className="text-xs font-bold my-1">{children}</h3>,
+          }}
+        >
+          {textContent}
+        </ReactMarkdown>
+      );
     }
 
-    // 如果没有任何匹配，直接返回 content
-    if (parts.length === 0) return content;
+    // 如果没有任何匹配，直接使用 Markdown 渲染整个内容
+    if (parts.length === 0) {
+      return (
+        <ReactMarkdown
+          components={{
+            p: ({ children }) => <span>{children}</span>,
+            strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+            em: ({ children }) => <em className="italic">{children}</em>,
+            code: ({ children }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+            pre: ({ children }) => <pre className="bg-gray-100 p-2 rounded text-xs font-mono overflow-x-auto my-1">{children}</pre>,
+            ul: ({ children }) => <ul className="list-disc list-inside my-1 space-y-0.5">{children}</ul>,
+            ol: ({ children }) => <ol className="list-decimal list-inside my-1 space-y-0.5">{children}</ol>,
+            li: ({ children }) => <li className="ml-2">{children}</li>,
+            blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-300 pl-2 my-1 italic">{children}</blockquote>,
+            a: ({ href, children }) => <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+            h1: ({ children }) => <h1 className="text-base font-bold my-1">{children}</h1>,
+            h2: ({ children }) => <h2 className="text-sm font-bold my-1">{children}</h2>,
+            h3: ({ children }) => <h3 className="text-xs font-bold my-1">{children}</h3>,
+          }}
+        >
+          {content}
+        </ReactMarkdown>
+      );
+    }
 
     return <>{parts}</>;
   };

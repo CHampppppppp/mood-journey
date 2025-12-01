@@ -118,10 +118,19 @@ SMTP_FROM=qq号@qq.com
 # 利用 AI 进行语义判断（是要采用 RAG 还是正常聊天）
 SMART_QUERY_CLASSIFIER=true
 
-# 天气API配置（二选一即可，推荐使用高德地图API，更适合中国城市）
-# 高德地图API（推荐，免费额度充足，适合中国城市）
-AMAP_API_KEY="高德地图API密钥"
+# 天气API配置（三选一即可，推荐使用和风天气API）
+# 和风天气API（最推荐，免费额度充足，最适合中国城市）
+# 获取方式：https://dev.qweather.com/
+# 1. 注册账号并创建应用
+# 2. 在控制台-设置中查看你的 API Host（格式如：abcxyz.qweatherapi.com）
+# 3. 获取 API Key
+QWEATHER_API_KEY="和风天气API密钥"
+# QWEATHER_API_HOST="你的API Host"  # 可选，如果不配置则使用默认免费版端点
+# 或使用高德地图API（适合中国城市）
+# 获取方式：https://console.amap.com/dev/key/app
+# AMAP_API_KEY="高德地图API密钥"
 # 或使用 OpenWeatherMap API（国际通用）
+# 获取方式：https://openweathermap.org/api
 # OPENWEATHER_API_KEY="OpenWeatherMap API密钥"
 
 # CRON Job（每日定期执行某些任务，这里是检查经期）
