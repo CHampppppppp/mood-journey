@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 /**
  * 数据库初始化脚本
  * 自动执行 migrations 来创建数据库表

@@ -8,221 +8,175 @@ import {
 } from '@/lib/llm';
 import { searchMemories, addMemories, type MemoryRecord } from '@/lib/vectorStore';
 import { TOOLS } from '@/lib/tools';
-import { logMoodFromAI, trackPeriodFromAI } from '@/lib/actions';
+import { 
+  logMoodFromAI, 
+  trackPeriodFromAI,
+  listMoodsFromAI,
+  updateMoodFromAI,
+  deleteMoodFromAI,
+  listPeriodsFromAI,
+  updatePeriodFromAI,
+  deletePeriodFromAI,
+  listMemoriesFromAI,
+  updateMemoryFromAI,
+  deleteMemoryFromAI,
+} from '@/lib/actions';
+import * as jose from 'jose';
+
+// JWT Token 缓存，避免每次请求都重新生成
+let cachedJwtToken: string | null = null;
+let cachedJwtExpiry: number = 0;
+
+/**
+ * 生成和风天气 JWT Token
+ * 使用 Ed25519 私钥签名
+ * 
+ * 参考文档: https://dev.qweather.com/docs/configuration/authentication/
+ */
+async function generateQWeatherJWT(): Promise<string> {
+  const privateKeyPem = process.env.QWEATHER_PRIVATE_KEY;
+  const keyId = process.env.QWEATHER_KEY_ID;
+  const projectId = process.env.QWEATHER_PROJECT_ID;
+
+  if (!privateKeyPem || !keyId || !projectId) {
+    throw new Error('缺少 JWT 配置：QWEATHER_PRIVATE_KEY, QWEATHER_KEY_ID, QWEATHER_PROJECT_ID');
+  }
+
+  // 检查缓存的 token 是否还有效（提前5分钟过期）
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedJwtToken && cachedJwtExpiry > now + 300) {
+    return cachedJwtToken;
+  }
+
+  // 解析 PEM 格式的私钥
+  // 处理环境变量中的换行符（\n 字符串转为实际换行）
+  const formattedKey = privateKeyPem.replace(/\\n/g, '\n');
+  const privateKey = await jose.importPKCS8(formattedKey, 'EdDSA');
+
+  // 设置时间：iat 为当前时间前30秒，exp 为15分钟后
+  const iat = now - 30;
+  const exp = now + 900; // 15分钟有效期
+
+  // 生成 JWT
+  const jwt = await new jose.SignJWT({ sub: projectId })
+    .setProtectedHeader({ alg: 'EdDSA', kid: keyId })
+    .setIssuedAt(iat)
+    .setExpirationTime(exp)
+    .sign(privateKey);
+
+  // 缓存 token
+  cachedJwtToken = jwt;
+  cachedJwtExpiry = exp;
+
+  console.log('[QWeather] 已生成新的 JWT Token，有效期至:', new Date(exp * 1000).toLocaleString('zh-CN'));
+
+  return jwt;
+}
 
 /**
  * 获取天气信息
- * 支持多种天气API（按优先级）：
- * 1. 和风天气API (需要 QWEATHER_API_KEY 和 QWEATHER_API_HOST，推荐，最适合中国城市)
- * 2. 高德地图API (需要 AMAP_API_KEY，适合中国城市)
- * 3. OpenWeatherMap (需要 OPENWEATHER_API_KEY，国际通用)
+ * 使用和风天气 API + JWT 认证
  * 
- * 和风天气API配置说明：
- * - QWEATHER_API_KEY: API密钥（在控制台获取）
- * - QWEATHER_API_HOST: API Host（在控制台-设置中查看，格式如：abcxyz.qweatherapi.com）
- *   如果不配置，将使用默认的 devapi.qweather.com（免费版）或 api.qweather.com（商业版）
+ * 环境变量配置：
+ * - QWEATHER_PRIVATE_KEY: Ed25519 私钥（PEM格式，必须）
+ * - QWEATHER_KEY_ID: 凭据ID（必须）
+ * - QWEATHER_PROJECT_ID: 项目ID（必须）
+ * - QWEATHER_API_HOST: API Host（必须，从控制台获取）
+ * 
+ * 参考文档: 
+ * - https://dev.qweather.com/docs/configuration/authentication/
+ * - https://dev.qweather.com/docs/api/geoapi/city-lookup/
  */
 async function getWeatherInfo(city: string): Promise<string> {
-  // 优先使用和风天气API（最适合中国城市）
-  const qweatherKey = process.env.QWEATHER_API_KEY;
-  const qweatherHost = process.env.QWEATHER_API_HOST; // 自定义API Host
-  
-  if (qweatherKey) {
-    try {
-      // 确定API Host：优先使用自定义Host，否则使用默认免费版
-      const apiHost = qweatherHost || 'devapi.qweather.com';
-      
-      // 和风天气API支持直接使用城市名称查询
-      // 先尝试通过城市搜索获取location ID（更准确）
-      const searchUrl = `https://${apiHost}/v2/city/lookup?location=${encodeURIComponent(city)}&number=1`;
-      const searchResponse = await fetch(searchUrl, {
-        headers: {
-          'X-QW-Api-Key': qweatherKey,
-        },
-      });
-      
-      let locationId = city; // 默认使用城市名
-      let locationName = city;
-      
-      if (searchResponse.ok) {
-        const searchData = await searchResponse.json();
-        
-        if (searchData.code === '200' && searchData.location && searchData.location.length > 0) {
-          locationId = searchData.location[0].id; // 使用找到的城市ID
-          locationName = searchData.location[0].name;
-          console.log(`[getWeatherInfo] 和风天气找到城市: ${locationName} (ID: ${locationId})`);
-        } else {
-          const errorCode = searchData.code || '未知';
-          console.warn(`[getWeatherInfo] 和风天气城市搜索未找到: ${city} (错误码: ${errorCode})，将使用城市名直接查询`);
-        }
-      } else {
-        const errorText = await searchResponse.text().catch(() => '');
-        console.warn(`[getWeatherInfo] 和风天气城市搜索失败: ${searchResponse.status} ${searchResponse.statusText}`);
-        if (errorText) {
-          try {
-            const errorData = JSON.parse(errorText);
-            console.warn(`[getWeatherInfo] 错误详情:`, errorData);
-          } catch {
-            console.warn(`[getWeatherInfo] 错误详情: ${errorText.substring(0, 200)}`);
-          }
-        }
-      }
-      
-      // 获取实时天气（使用location ID或城市名）
-      const weatherUrl = `https://${apiHost}/v7/weather/now?location=${locationId}`;
-      const weatherResponse = await fetch(weatherUrl, {
-        headers: {
-          'X-QW-Api-Key': qweatherKey,
-        },
-      });
-      
-      if (weatherResponse.ok) {
-        const weatherData = await weatherResponse.json();
-        
-        if (weatherData.code === '200' && weatherData.now) {
-          const now = weatherData.now;
-          return `【${locationName}天气】\n天气：${now.text}\n温度：${now.temp}℃\n体感温度：${now.feelsLike}℃\n风向：${now.windDir}\n风力：${now.windScale}级\n风速：${now.windSpeed} km/h\n湿度：${now.humidity}%\n能见度：${now.vis} km\n气压：${now.pressure} hPa\n更新时间：${now.obsTime}`;
-        } else {
-          const errorMsg = weatherData.code || '未知错误';
-          const errorText = weatherData.message || '';
-          console.error(`[getWeatherInfo] 和风天气API返回错误: ${errorMsg} ${errorText}`, JSON.stringify(weatherData));
-        }
-      } else {
-        const errorText = await weatherResponse.text().catch(() => '');
-        console.error(`[getWeatherInfo] 和风天气API HTTP错误: ${weatherResponse.status} ${weatherResponse.statusText}`);
-        if (errorText) {
-          try {
-            const errorData = JSON.parse(errorText);
-            console.error(`[getWeatherInfo] 错误详情:`, errorData);
-          } catch {
-            console.error(`[getWeatherInfo] 错误详情: ${errorText.substring(0, 200)}`);
-          }
-        }
-        
-        // 如果使用默认Host失败，且没有配置自定义Host，尝试商业版端点
-        if (!qweatherHost && weatherResponse.status === 403) {
-          console.warn('[getWeatherInfo] 免费版API返回403，尝试使用商业版API端点...');
-          const commercialUrl = `https://api.qweather.com/v7/weather/now?location=${locationId}`;
-          const commercialResponse = await fetch(commercialUrl, {
-            headers: {
-              'X-QW-Api-Key': qweatherKey,
-            },
-          });
-          if (commercialResponse.ok) {
-            const commercialData = await commercialResponse.json();
-            if (commercialData.code === '200' && commercialData.now) {
-              const now = commercialData.now;
-              return `【${locationName}天气】\n天气：${now.text}\n温度：${now.temp}℃\n体感温度：${now.feelsLike}℃\n风向：${now.windDir}\n风力：${now.windScale}级\n风速：${now.windSpeed} km/h\n湿度：${now.humidity}%\n能见度：${now.vis} km\n气压：${now.pressure} hPa\n更新时间：${now.obsTime}`;
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('[getWeatherInfo] 和风天气API调用失败:', error);
-    }
+  const qweatherHost = process.env.QWEATHER_API_HOST;
+
+  if (!qweatherHost) {
+    return `抱歉，天气服务暂时不可用。请确保已配置API Host（QWEATHER_API_HOST）。`;
   }
 
-  // 备用1：使用高德地图API（适合中国城市）
-  const amapKey = process.env.AMAP_API_KEY;
-  if (amapKey) {
-    try {
-      // 高德地图API可能需要城市名称带"市"后缀，尝试两种格式
-      let cityName = city;
-      if (!city.endsWith('市') && !city.endsWith('县') && !city.endsWith('区')) {
-        cityName = `${city}市`; // 尝试添加"市"后缀
-      }
-      
-      const url = `https://restapi.amap.com/v3/weather/weatherInfo?key=${amapKey}&city=${encodeURIComponent(cityName)}&extensions=base&output=json`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        console.error(`[getWeatherInfo] 高德地图API HTTP错误: ${response.status} ${response.statusText}`);
-        // 如果带"市"失败，尝试原始城市名
-        if (cityName !== city) {
-          const url2 = `https://restapi.amap.com/v3/weather/weatherInfo?key=${amapKey}&city=${encodeURIComponent(city)}&extensions=base&output=json`;
-          const response2 = await fetch(url2);
-          if (response2.ok) {
-            const data2 = await response2.json();
-            if (data2.status === '1' && data2.lives && data2.lives.length > 0) {
-              const weather = data2.lives[0];
-              return `【${weather.city}天气】\n天气：${weather.weather}\n温度：${weather.temperature}℃\n风向：${weather.winddirection}\n风力：${weather.windpower}级\n湿度：${weather.humidity}%\n发布时间：${weather.reporttime}`;
-            }
-          }
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.status === '1' && data.lives && data.lives.length > 0) {
-        const weather = data.lives[0];
-        return `【${weather.city}天气】\n天气：${weather.weather}\n温度：${weather.temperature}℃\n风向：${weather.winddirection}\n风力：${weather.windpower}级\n湿度：${weather.humidity}%\n发布时间：${weather.reporttime}`;
-      } else {
-        // 记录详细的错误信息
-        const errorMsg = data.infocode ? `错误码: ${data.infocode}, 信息: ${data.info || '未知错误'}` : '未知错误';
-        console.error(`[getWeatherInfo] 高德地图API返回错误: ${errorMsg}`, JSON.stringify(data));
-        
-        // 如果是平台不匹配错误，提供更明确的提示
-        if (data.infocode === '10009' || data.info === 'USERKEY_PLAT_NOMATCH') {
-          console.error('[getWeatherInfo] 高德地图API密钥平台不匹配，请检查：1) 是否使用了Web服务(JS API)密钥而非服务端密钥；2) 是否需要在控制台设置IP白名单或服务器域名白名单');
-        }
-        
-        // 如果带"市"失败，尝试原始城市名
-        if (cityName !== city) {
-          const url2 = `https://restapi.amap.com/v3/weather/weatherInfo?key=${amapKey}&city=${encodeURIComponent(city)}&extensions=base&output=json`;
-          const response2 = await fetch(url2);
-          if (response2.ok) {
-            const data2 = await response2.json();
-            if (data2.status === '1' && data2.lives && data2.lives.length > 0) {
-              const weather = data2.lives[0];
-              return `【${weather.city}天气】\n天气：${weather.weather}\n温度：${weather.temperature}℃\n风向：${weather.winddirection}\n风力：${weather.windpower}级\n湿度：${weather.humidity}%\n发布时间：${weather.reporttime}`;
-            }
-          }
-        }
-        // 继续尝试备用API
-      }
-    } catch (error) {
-      console.error('[getWeatherInfo] 高德地图API调用失败:', error);
-      // 继续尝试备用API
-    }
+  // 生成 JWT Token
+  let jwtToken: string;
+  try {
+    jwtToken = await generateQWeatherJWT();
+  } catch (error) {
+    console.error('[getWeatherInfo] JWT生成失败:', error);
+    return `抱歉，天气服务配置错误。${error instanceof Error ? error.message : ''}`;
   }
 
-  // 备用：使用 OpenWeatherMap API
-  const openWeatherKey = process.env.OPENWEATHER_API_KEY;
-  if (openWeatherKey) {
-    try {
-      const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${openWeatherKey}&units=metric&lang=zh_cn`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        console.error(`[getWeatherInfo] OpenWeatherMap API HTTP错误: ${response.status} ${response.statusText}`);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.cod === 200) {
-        return `【${data.name}天气】\n天气：${data.weather[0].description}\n温度：${Math.round(data.main.temp)}℃\n体感温度：${Math.round(data.main.feels_like)}℃\n最高温度：${Math.round(data.main.temp_max)}℃\n最低温度：${Math.round(data.main.temp_min)}℃\n湿度：${data.main.humidity}%\n风速：${data.wind?.speed || 0} m/s`;
-      } else {
-        const errorMsg = data.message || '未知错误';
-        console.error(`[getWeatherInfo] OpenWeatherMap API返回错误: ${errorMsg}`, JSON.stringify(data));
-        // 404通常表示城市未找到，尝试使用英文城市名或拼音
-        if (response.status === 404) {
-          console.warn(`[getWeatherInfo] 城市"${city}"未找到，OpenWeatherMap可能需要英文城市名`);
-        }
-        return `抱歉，无法获取 ${city} 的天气信息：${errorMsg}`;
-      }
-    } catch (error) {
-      console.error('[getWeatherInfo] OpenWeatherMap API调用失败:', error);
-    }
-  }
+  // 构建请求 Headers（使用 JWT Bearer Token）
+  const fetchOptions: RequestInit = {
+    headers: { 'Authorization': `Bearer ${jwtToken}` }
+  };
 
-  // 如果所有API都不可用
-  if (!qweatherKey && !amapKey && !openWeatherKey) {
-    return `抱歉，天气服务暂时不可用。请确保已配置天气API密钥（推荐：QWEATHER_API_KEY，或使用 AMAP_API_KEY / OPENWEATHER_API_KEY）。`;
+  try {
+    // 1. 获取城市ID（GeoAPI 路径: /geo/v2/city/lookup）
+    // 注意：GeoAPI 和天气 API 使用同一个 API Host
+    const cityLookupUrl = `https://${qweatherHost}/geo/v2/city/lookup?location=${encodeURIComponent(city)}`;
+    const cityRes = await fetch(cityLookupUrl, fetchOptions);
+    
+    if (!cityRes.ok) {
+       const errorText = await cityRes.text();
+       console.error(`[getWeatherInfo] 城市查询API请求失败: ${cityRes.status} ${cityRes.statusText}`, errorText);
+       return `抱歉，天气服务暂时不可用 (City API Error: ${cityRes.status})。`;
+    }
+
+    const cityResText = await cityRes.text();
+    if (!cityResText) {
+      console.error(`[getWeatherInfo] 城市查询API返回为空`);
+      return `抱歉，天气服务暂时不可用 (Empty Response)。`;
+    }
+
+    let cityData;
+    try {
+      cityData = JSON.parse(cityResText);
+    } catch (e) {
+       console.error(`[getWeatherInfo] 城市查询API返回无效JSON:`, cityResText);
+       return `抱歉，天气服务暂时不可用 (Invalid JSON)。`;
+    }
+
+    if (cityData.code !== '200' || !cityData.location || cityData.location.length === 0) {
+      return `抱歉，找不到城市 ${city} 的信息。`;
+    }
+
+    const locationId = cityData.location[0].id;
+    const cityName = cityData.location[0].name;
+
+    // 2. 获取天气预报 (每日预报)
+    // 文档: https://dev.qweather.com/docs/api/weather/weather-daily-forecast/
+    const weatherUrl = `https://${qweatherHost}/v7/weather/3d?location=${locationId}`;
+    const weatherRes = await fetch(weatherUrl, fetchOptions);
+
+    if (!weatherRes.ok) {
+      const errorText = await weatherRes.text();
+      console.error(`[getWeatherInfo] 天气查询API请求失败: ${weatherRes.status} ${weatherRes.statusText}`, errorText);
+      return `抱歉，天气服务暂时不可用 (Weather API Error: ${weatherRes.status})。`;
+    }
+
+    const weatherResText = await weatherRes.text();
+    if (!weatherResText) {
+       console.error(`[getWeatherInfo] 天气查询API返回为空`);
+       return `抱歉，天气服务暂时不可用 (Empty Weather Response)。`;
+    }
+
+    let weatherData;
+    try {
+       weatherData = JSON.parse(weatherResText);
+    } catch (e) {
+       console.error(`[getWeatherInfo] 天气查询API返回无效JSON:`, weatherResText);
+       return `抱歉，天气服务暂时不可用 (Invalid Weather JSON)。`;
+    }
+
+    if (weatherData.code === '200' && weatherData.daily && weatherData.daily.length > 0) {
+      const today = weatherData.daily[0];
+      return `【${cityName}今日天气】\n天气：${today.textDay} (白天) / ${today.textNight} (夜间)\n温度：${today.tempMin}℃ ~ ${today.tempMax}℃\n风向：${today.windDirDay}\n风力：${today.windScaleDay}级\n湿度：${today.humidity}%\n降水：${today.precip}mm\n更新时间：${new Date(weatherData.updateTime).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`;
+    } else {
+      return `抱歉，无法获取 ${cityName} 的天气信息 (Code: ${weatherData.code})。`;
+    }
+
+  } catch (error) {
+    console.error('[getWeatherInfo] 和风天气API调用失败:', error);
+    return `抱歉，获取天气信息时发生错误。`;
   }
-  
-  return `抱歉，无法获取 ${city} 的天气信息。请检查API密钥配置是否正确，或稍后再试。`;
 }
 
 type ApiChatMessage = {
@@ -392,15 +346,44 @@ export async function POST(req: NextRequest) {
           let result = { success: true, message: 'Tool executed successfully.' };
 
           try {
+            // ==================== 心情记录相关工具 ====================
             if (fnName === 'log_mood') {
               await logMoodFromAI(args as any);
               result = { success: true, message: '心情已记录。' };
-              needsRefresh = true; // 标记需要刷新页面
-            } else if (fnName === 'track_period') {
+              needsRefresh = true;
+            } else if (fnName === 'list_moods') {
+              const listResult = await listMoodsFromAI(args as any);
+              result = listResult;
+              // 查询不需要刷新页面
+            } else if (fnName === 'update_mood') {
+              const updateResult = await updateMoodFromAI(args as any);
+              result = updateResult;
+              if (updateResult.success) needsRefresh = true;
+            } else if (fnName === 'delete_mood') {
+              const deleteResult = await deleteMoodFromAI(args as any);
+              result = deleteResult;
+              if (deleteResult.success) needsRefresh = true;
+            }
+            // ==================== 经期记录相关工具 ====================
+            else if (fnName === 'track_period') {
               await trackPeriodFromAI(args as any);
               result = { success: true, message: '经期已记录。' };
-              needsRefresh = true; // 标记需要刷新页面
-            } else if (fnName === 'save_memory') {
+              needsRefresh = true;
+            } else if (fnName === 'list_periods') {
+              const listResult = await listPeriodsFromAI(args as any);
+              result = listResult;
+              // 查询不需要刷新页面
+            } else if (fnName === 'update_period') {
+              const updateResult = await updatePeriodFromAI(args as any);
+              result = updateResult;
+              if (updateResult.success) needsRefresh = true;
+            } else if (fnName === 'delete_period') {
+              const deleteResult = await deletePeriodFromAI(args as any);
+              result = deleteResult;
+              if (deleteResult.success) needsRefresh = true;
+            }
+            // ==================== 其他工具 ====================
+            else if (fnName === 'save_memory') {
               const content = (args as any).content;
               if (content) {
                 const now = new Date();
@@ -420,6 +403,17 @@ export async function POST(req: NextRequest) {
               } else {
                 result = { success: false, message: 'Content is required.' };
               }
+            } else if (fnName === 'list_memories') {
+              const listResult = await listMemoriesFromAI(args as any);
+              result = listResult;
+            } else if (fnName === 'update_memory') {
+              const updateResult = await updateMemoryFromAI(args as any);
+              result = updateResult;
+              if (updateResult.success) needsRefresh = true;
+            } else if (fnName === 'delete_memory') {
+              const deleteResult = await deleteMemoryFromAI(args as any);
+              result = deleteResult;
+              if (deleteResult.success) needsRefresh = true;
             } else if (fnName === 'show_sticker') {
               const category = (args as any).category;
               result = { 

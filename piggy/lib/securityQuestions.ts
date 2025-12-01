@@ -1,3 +1,14 @@
+/**
+ * Security Questions - 密保问题配置
+ * 
+ * 这个文件定义了用于找回密码的密保问题及其正确答案。
+ * 主要功能：
+ * 1. 静态数据定义：包含问题 ID、问题文本、选项列表和正确选项 ID。
+ * 2. 类型定义：导出 SecurityQuestion 类型供前端组件和后端验证逻辑使用。
+ * 
+ * 注意：正确答案是硬编码在代码中的（correctOptionId），属于静态配置。
+ */
+
 export type SecurityQuestion = {
   id: string;
   question: string;

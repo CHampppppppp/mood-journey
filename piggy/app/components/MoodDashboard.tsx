@@ -123,6 +123,8 @@ function addPeriodInterval(status: PeriodStatus, start: Date, type: 'actual' | '
  * 2. 计算相邻两次经期开始日期的间隔
  * 3. 取所有间隔的平均值
  * 4. 将结果限制在合理范围内（21-35 天）
+ * 
+ * 注意：使用 created_at 而非 start_date，因为 start_date 可能因服务器 UTC 时区导致日期偏移
  */
 function calculateCycleLengthDays(sortedPeriods: Period[]) {
   if (sortedPeriods.length < 2) {
@@ -131,8 +133,9 @@ function calculateCycleLengthDays(sortedPeriods: Period[]) {
 
   const diffs: number[] = [];
   for (let i = 1; i < sortedPeriods.length; i++) {
-    const prev = normalizeDate(new Date(sortedPeriods[i - 1].start_date));
-    const current = normalizeDate(new Date(sortedPeriods[i].start_date));
+    // 使用 created_at 作为实际经期开始日期，避免时区问题
+    const prev = normalizeDate(new Date(sortedPeriods[i - 1].created_at));
+    const current = normalizeDate(new Date(sortedPeriods[i].created_at));
     const diff = differenceInCalendarDays(current, prev);
     if (diff > 0) {
       diffs.push(diff);
@@ -157,6 +160,8 @@ function calculateCycleLengthDays(sortedPeriods: Period[]) {
  * 2. 根据历史数据计算平均周期长度
  * 3. 从最后一次实际记录开始，按周期预测未来 180 天的经期
  * 4. 将预测的日期标记为 'predicted'
+ * 
+ * 注意：使用 created_at 而非 start_date，因为 start_date 可能因服务器 UTC 时区导致日期偏移
  */
 function buildPeriodStatus(periods: Period[]): PeriodStatus {
   const status: PeriodStatus = {};
@@ -164,20 +169,20 @@ function buildPeriodStatus(periods: Period[]): PeriodStatus {
     return status;
   }
 
-  // 按时间排序，确保处理顺序正确
+  // 按 created_at 排序，确保处理顺序正确（避免 start_date 的时区问题）
   const sorted = [...periods].sort(
-    (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
 
-  // 标记所有实际记录的经期日期
+  // 标记所有实际记录的经期日期（使用 created_at 作为开始日期）
   sorted.forEach((period) => {
-    const start = normalizeDate(new Date(period.start_date));
+    const start = normalizeDate(new Date(period.created_at));
     addPeriodInterval(status, start, 'actual');
   });
 
   // 计算周期长度并预测未来经期
   const cycleDays = calculateCycleLengthDays(sorted);
-  const lastActualStart = normalizeDate(new Date(sorted[sorted.length - 1].start_date));
+  const lastActualStart = normalizeDate(new Date(sorted[sorted.length - 1].created_at));
   const horizonEnd = addDays(startOfDay(new Date()), PREDICTION_HORIZON_DAYS);
 
   // 从最后一次实际记录开始，按周期预测未来经期
@@ -820,7 +825,7 @@ export default function MoodDashboard({ moods, periods }: { moods: Mood[], perio
                   animate={{ y: 0 }}
                   exit={{ y: "100%" }}
                   transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                  className="w-full max-w-sm bg-white border-t-4 sm:border-4 border-black rounded-t-3xl sm:rounded-3xl px-4 py-4 sm:shadow-[6px_6px_0_#1a1a1a] h-[82vh] sm:h-auto sm:max-h-[90vh] overflow-hidden"
+                  className="w-full max-w-sm bg-white border-t-4 sm:border-4 border-black rounded-t-3xl sm:rounded-3xl px-4 py-4 sm:shadow-[6px_6px_0_#1a1a1a] h-auto max-h-[92vh] sm:max-h-[90vh] overflow-y-auto scrollbar-hide"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* 拖拽指示条 (仅移动端) */}

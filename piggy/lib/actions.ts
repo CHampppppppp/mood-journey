@@ -1,3 +1,16 @@
+/**
+ * Server Actions - 业务逻辑处理层
+ * 
+ * 这个文件包含了应用的核心业务逻辑，作为 Next.js 的 Server Actions 供前端调用。
+ * 主要功能：
+ * 1. 心情记录管理 (CRUD)：处理心情的记录、查询、更新和删除。
+ * 2. 经期记录管理 (CRUD)：处理经期的记录、查询、更新和删除。
+ * 3. 副作用处理：在保存心情时触发邮件提醒（强度较高时）和向量记忆存储。
+ * 4. AI 交互接口：提供给 AI 工具调用的专用函数 (xxxFromAI)。
+ * 
+ * 依赖：db, email, vectorStore
+ */
+
 'use server';
 
 import pool from './db';
@@ -5,7 +18,7 @@ import { revalidatePath } from 'next/cache';
 
 import type { Mood, Period } from './types';
 import { sendSuperMoodAlert } from './email';
-import { addMemories, type MemoryRecord } from './vectorStore';
+import { addMemories, searchMemories, deleteMemories, type MemoryRecord } from './vectorStore';
 export type { Mood, Period } from './types';
 
 // 标记 date_key 列是否已确保存在（避免重复检查）
@@ -162,8 +175,10 @@ export async function getMoods() {
 }
 
 // 获取所有经期记录
+// 注意：使用 created_at 排序和作为经期开始日期，避免时区问题
+// start_date 字段由于服务器 UTC 时区可能会比实际日期早一天
 export async function getPeriods() {
-  const { rows } = await pool.query('SELECT * FROM periods ORDER BY start_date DESC');
+  const { rows } = await pool.query('SELECT * FROM periods ORDER BY created_at DESC');
   return rows as Period[];
 }
 
@@ -250,4 +265,331 @@ export async function trackPeriodFromAI({ startDate }: { startDate?: string }) {
   );
   revalidatePath('/');
   return { success: true, date: date.toISOString() };
+}
+
+// ==================== AI 查询/修改/删除功能 ====================
+
+/**
+ * 心情名称映射（用于显示给用户）
+ */
+const MOOD_LABELS: Record<string, string> = {
+  happy: '开心',
+  blissful: '幸福',
+  tired: '累',
+  annoyed: '烦躁',
+  angry: '生气',
+  depressed: '沮丧',
+};
+
+/**
+ * AI 调用：查询心情记录列表
+ */
+export async function listMoodsFromAI({ limit = 5, date }: { limit?: number; date?: string }) {
+  const safeLimit = Math.min(Math.max(1, limit), 20);
+  
+  let query = 'SELECT id, mood, intensity, note, date_key, created_at FROM moods';
+  const params: any[] = [];
+  
+  if (date) {
+    query += ' WHERE date_key = ?';
+    params.push(date);
+  }
+  
+  query += ' ORDER BY created_at DESC LIMIT ?';
+  params.push(safeLimit);
+  
+  const { rows } = await pool.query<{
+    id: number;
+    mood: string;
+    intensity: number;
+    note: string;
+    date_key: string;
+    created_at: Date;
+  }>(query, params);
+  
+  if (rows.length === 0) {
+    return { 
+      success: true, 
+      message: date ? `${date} 没有心情记录。` : '还没有任何心情记录。',
+      moods: [] 
+    };
+  }
+  
+  // 格式化记录，方便 AI 展示给用户
+  const formattedMoods = rows.map((m, idx) => {
+    const dateStr = m.date_key || new Date(m.created_at).toLocaleDateString('zh-CN');
+    const moodLabel = MOOD_LABELS[m.mood] || m.mood;
+    const intensityLabel = ['', '一点点', '中度', '超级'][m.intensity] || '';
+    return {
+      index: idx + 1,
+      id: m.id,
+      date: dateStr,
+      mood: moodLabel,
+      intensity: intensityLabel,
+      note: m.note || '无',
+      summary: `${idx + 1}. [ID:${m.id}] ${dateStr} - ${intensityLabel}${moodLabel}${m.note ? `（${m.note}）` : ''}`,
+    };
+  });
+  
+  return {
+    success: true,
+    message: `找到 ${rows.length} 条心情记录：\n${formattedMoods.map(m => m.summary).join('\n')}`,
+    moods: formattedMoods,
+  };
+}
+
+/**
+ * AI 调用：修改心情记录
+ */
+export async function updateMoodFromAI({ 
+  id, 
+  mood, 
+  intensity, 
+  note 
+}: { 
+  id: number; 
+  mood?: string; 
+  intensity?: number; 
+  note?: string;
+}) {
+  // 先检查记录是否存在
+  const { rows: existing } = await pool.query<{ id: number; mood: string; intensity: number; note: string }>(
+    'SELECT id, mood, intensity, note FROM moods WHERE id = ?',
+    [id]
+  );
+  
+  if (!existing || existing.length === 0) {
+    return { success: false, message: `找不到 ID 为 ${id} 的心情记录。` };
+  }
+  
+  const current = existing[0];
+  const newMood = mood || current.mood;
+  const newIntensity = intensity ?? current.intensity;
+  const newNote = note !== undefined ? note : current.note;
+  
+  await pool.query(
+    'UPDATE moods SET mood = ?, intensity = ?, note = ? WHERE id = ?',
+    [newMood, newIntensity, newNote, id]
+  );
+  
+  revalidatePath('/');
+  
+  const moodLabel = MOOD_LABELS[newMood] || newMood;
+  const intensityLabel = ['', '一点点', '中度', '超级'][newIntensity] || '';
+  
+  return { 
+    success: true, 
+    message: `已将心情记录修改为：${intensityLabel}${moodLabel}${newNote ? `（${newNote}）` : ''}` 
+  };
+}
+
+/**
+ * AI 调用：删除心情记录
+ */
+export async function deleteMoodFromAI({ id }: { id: number }) {
+  // 先检查记录是否存在
+  const { rows: existing } = await pool.query<{ id: number; mood: string; date_key: string }>(
+    'SELECT id, mood, date_key FROM moods WHERE id = ?',
+    [id]
+  );
+  
+  if (!existing || existing.length === 0) {
+    return { success: false, message: `找不到 ID 为 ${id} 的心情记录。` };
+  }
+  
+  const record = existing[0];
+  const moodLabel = MOOD_LABELS[record.mood] || record.mood;
+  
+  await pool.query('DELETE FROM moods WHERE id = ?', [id]);
+  
+  revalidatePath('/');
+  
+  return { 
+    success: true, 
+    message: `已删除 ${record.date_key || '该日期'} 的 ${moodLabel} 心情记录。` 
+  };
+}
+
+/**
+ * AI 调用：查询经期记录列表
+ */
+export async function listPeriodsFromAI({ limit = 5 }: { limit?: number }) {
+  const safeLimit = Math.min(Math.max(1, limit), 12);
+  
+  // 使用 created_at 而非 start_date，避免时区问题
+  const { rows } = await pool.query<{
+    id: number;
+    start_date: Date;
+    created_at: Date;
+  }>(
+    'SELECT id, start_date, created_at FROM periods ORDER BY created_at DESC LIMIT ?',
+    [safeLimit]
+  );
+  
+  if (rows.length === 0) {
+    return { 
+      success: true, 
+      message: '还没有任何经期记录。',
+      periods: [] 
+    };
+  }
+  
+  // 格式化记录
+  const formattedPeriods = rows.map((p, idx) => {
+    // 使用 created_at 作为实际开始日期
+    const dateStr = new Date(p.created_at).toLocaleDateString('zh-CN');
+    return {
+      index: idx + 1,
+      id: p.id,
+      date: dateStr,
+      summary: `${idx + 1}. [ID:${p.id}] ${dateStr}`,
+    };
+  });
+  
+  return {
+    success: true,
+    message: `找到 ${rows.length} 条经期记录：\n${formattedPeriods.map(p => p.summary).join('\n')}`,
+    periods: formattedPeriods,
+  };
+}
+
+/**
+ * AI 调用：修改经期记录
+ */
+export async function updatePeriodFromAI({ id, startDate }: { id: number; startDate: string }) {
+  // 先检查记录是否存在
+  const { rows: existing } = await pool.query<{ id: number }>(
+    'SELECT id FROM periods WHERE id = ?',
+    [id]
+  );
+  
+  if (!existing || existing.length === 0) {
+    return { success: false, message: `找不到 ID 为 ${id} 的经期记录。` };
+  }
+  
+  const newDate = new Date(startDate);
+  
+  // 更新 start_date 和 created_at，保持一致性
+  await pool.query(
+    'UPDATE periods SET start_date = ?, created_at = ? WHERE id = ?',
+    [newDate, newDate, id]
+  );
+  
+  revalidatePath('/');
+  
+  const dateStr = newDate.toLocaleDateString('zh-CN');
+  
+  return { 
+    success: true, 
+    message: `已将经期开始日期修改为 ${dateStr}。` 
+  };
+}
+
+/**
+ * AI 调用：删除经期记录
+ */
+export async function deletePeriodFromAI({ id }: { id: number }) {
+  // 先检查记录是否存在
+  const { rows: existing } = await pool.query<{ id: number; created_at: Date }>(
+    'SELECT id, created_at FROM periods WHERE id = ?',
+    [id]
+  );
+  
+  if (!existing || existing.length === 0) {
+    return { success: false, message: `找不到 ID 为 ${id} 的经期记录。` };
+  }
+  
+  const record = existing[0];
+  const dateStr = new Date(record.created_at).toLocaleDateString('zh-CN');
+  
+  await pool.query('DELETE FROM periods WHERE id = ?', [id]);
+  
+  revalidatePath('/');
+  
+  return { 
+    success: true, 
+    message: `已删除 ${dateStr} 的经期记录。` 
+  };
+}
+
+/**
+ * AI 调用：搜索/列出记忆
+ * 
+ * 使用向量搜索查找相关记忆，返回 ID 和内容，以便修改或删除
+ */
+export async function listMemoriesFromAI({ query, limit = 5 }: { query: string; limit?: number }) {
+  if (!query.trim()) {
+    return { success: false, message: '请提供搜索关键词。' };
+  }
+
+  const memories = await searchMemories(query, limit);
+
+  if (memories.length === 0) {
+    return { success: true, message: '没有找到相关的记忆。', memories: [] };
+  }
+
+  // 格式化输出，包含 ID 以便 AI 可以引用
+  const formatted = memories.map((m, i) => {
+    return `[${i + 1}] ID: ${m.id} (Time: ${m.metadata.datetime})\nContent: ${m.text}\n`;
+  }).join('\n');
+
+  return {
+    success: true,
+    message: `找到以下相关记忆：\n${formatted}\n\n如果要修改或删除，请使用 list 中的 ID。`,
+    memories: memories.map(m => ({
+      id: m.id,
+      text: m.text,
+      datetime: m.metadata.datetime
+    }))
+  };
+}
+
+/**
+ * AI 调用：修改记忆
+ * 
+ * 使用 upsert 机制（addMemories 会覆盖相同 ID 的记录）
+ */
+export async function updateMemoryFromAI({ id, content }: { id: string; content: string }) {
+  if (!id || !content) {
+    return { success: false, message: 'ID and content are required.' };
+  }
+  
+  const now = new Date();
+  const datetime = now.toISOString();
+  
+  // 构造 MemoryRecord
+  const memory: MemoryRecord = {
+    id: id,
+    text: content,
+    metadata: {
+      type: 'note', 
+      author: 'piggy',
+      datetime: datetime,
+    },
+  };
+
+  try {
+    await addMemories([memory]);
+    return { success: true, message: '记忆已更新。' };
+  } catch (err) {
+    console.error('Failed to update memory', err);
+    return { success: false, message: '更新失败。' };
+  }
+}
+
+/**
+ * AI 调用：删除记忆
+ */
+export async function deleteMemoryFromAI({ id }: { id: string }) {
+  if (!id) {
+    return { success: false, message: 'ID is required.' };
+  }
+
+  try {
+    await deleteMemories([id]);
+    return { success: true, message: '记忆已删除。' };
+  } catch (err) {
+    console.error('Failed to delete memory', err);
+    return { success: false, message: '删除失败。' };
+  }
 }

@@ -1,3 +1,14 @@
+/**
+ * Email Service - 邮件通知服务
+ * 
+ * 这个文件处理所有与邮件发送相关的功能。
+ * 主要功能：
+ * 1. 邮件传输配置：自动配置 Nodemailer Transporter，支持 SMTP 连接字符串或分离的参数配置。
+ *    - 智能推断常用邮箱服务（如 QQ 邮箱）的配置。
+ * 2. 心情预警 (Super Mood Alert)：当心情强度为 "超级" (3级) 时发送提醒邮件。
+ * 3. 经期预警 (Period Alert)：发送经期预测提醒邮件。
+ */
+
 import nodemailer from 'nodemailer';
 
 type SuperMoodPayload = {

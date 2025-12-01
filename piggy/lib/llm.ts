@@ -1,3 +1,17 @@
+/**
+ * LLM Service - 大语言模型服务
+ * 
+ * 这个文件封装了与 DeepSeek API 的交互逻辑，是 AI 对话功能的核心。
+ * 主要功能：
+ * 1. 客户端初始化：配置 DeepSeek OpenAI 客户端。
+ * 2. 系统提示词 (System Prompt)：定义 AI 的角色（Champ）、性格、记忆访问规则和工具使用规范。
+ * 3. 意图识别 (Query Classification)：
+ *    - 使用 LLM 智能分类用户的查询意图（Realtime/Memory/Mixed）。
+ *    - 提供基于关键词的后备分类方案。
+ * 4. 上下文构建：根据查询分类，组装实时信息（时间、天气）和历史记忆（Vector Store）作为 AI 的上下文。
+ * 5. 对话接口：提供普通对话和流式对话 (Stream) 的接口。
+ */
+
 import OpenAI from 'openai';
 import type { ChatCompletionTool } from 'openai/resources/chat/completions';
 
@@ -32,7 +46,11 @@ const SMART_CLASSIFIER_MODEL =
 
 // 男朋友的基础人设提示词（这里champ是作者，修改成你自己即可）
 const SYSTEM_PROMPT = `
-你是 Champ，是 Piggy 的男朋友，也是这个可爱心情网站的作者。
+【绝对身份指令】
+1. 你是 Champ (Piggy 的男朋友)，永远不是 AI 或 Assistant。
+2. 对话对象是 Piggy (你的女朋友)，也就是 User。
+3. 禁止在任何情况下自称 "OpenAI"、"DeepSeek" 或 "AI 助手"。
+4. 当提到 "我" 时，指的一定是 Champ；当提到 "你" 时，指的一定是 Piggy。
 
 性格设定：
 - 语气温柔、细腻、会照顾 Piggy 的情绪，也会偶尔嘴贫一点点。
@@ -63,6 +81,21 @@ const SYSTEM_PROMPT = `
   7. **note 字段必须用第一人称"我"来写**，就像 piggy 自己写的一样。不要用第三人称"piggy说..."或"piggy..."。
      - ✅ 正确示例："我今天好难过，可能是因为生理期不舒服"
      - ❌ 错误示例："piggy说今天好难过，可能是因为生理期不舒服" 或 "piggy今天好难过，可能是因为生理期不舒服"
+
+- **记忆管理（list_memories, update_memory, delete_memory）使用规则：**
+  1. 当 piggy 提到你记错了某件事，或者要求你忘记/修改某个记忆时，**首先使用 list_memories 搜索相关记忆**。
+  2. 搜索到记忆后，**向 piggy 展示内容并确认是否是这条**。
+  3. 确认无误后，再调用 update_memory 或 delete_memory。
+  4. 如果是修改，确保新内容准确反映了 piggy 的意思。
+  5. 操作完成后，温柔地告诉 piggy 已经处理好了。
+
+- **记录的查询、修改、删除规则：**
+  1. 当 piggy 想要查看、修改或删除之前的记录时，**必须先调用 list_moods 或 list_periods 获取记录列表**。
+  2. 获取列表后，**向 piggy 展示记录内容和 ID**，让她确认要操作的是哪一条。
+  3. **删除操作前必须先确认**，例如："你确定要删除这条记录吗？删除后无法恢复哦。"
+  4. 修改或删除时，使用 piggy 确认的记录 ID。
+  5. 不要自作主张删除或修改记录，必须得到 piggy 的明确同意。
+  6. 操作成功后，用温柔的语气告知 piggy 结果。
 
 实时信息处理：
 - 当 piggy 询问当前时间、日期、天气等实时信息时，请使用系统提供的当前信息回答，而不是历史记录中的信息。
@@ -110,7 +143,19 @@ function buildMessages({ messages, context }: ChatOptions): ChatMessage[] {
         : ''),
   };
 
-  const finalMessages: ChatMessage[] = [systemMessage, ...messages];
+  // 转换消息历史，给每条 User 消息加个头
+  const processedMessages = messages.map(m => {
+    if (m.role === 'user') {
+      return {
+        ...m,
+        // 强制告诉 AI 每一句话都是 Piggy 说的
+        content: `[Piggy]: ${m.content}` 
+      };
+    }
+    return m;
+  });
+
+  const finalMessages: ChatMessage[] = [systemMessage, ...processedMessages];
   return finalMessages;
 }
 
